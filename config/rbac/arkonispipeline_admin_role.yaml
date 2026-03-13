@@ -1,0 +1,21 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: arkonis-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: arkonispipeline-admin-role
+rules:
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkonispipelines
+  verbs:
+  - '*'
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkonispipelines/status
+  verbs:
+  - get

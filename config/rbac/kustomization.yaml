@@ -34,4 +34,7 @@ resources:
 - arkonisdeployment_admin_role.yaml
 - arkonisdeployment_editor_role.yaml
 - arkonisdeployment_viewer_role.yaml
+- arkonismemory_admin_role.yaml
+- arkonismemory_editor_role.yaml
+- arkonismemory_viewer_role.yaml
 
