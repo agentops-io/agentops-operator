@@ -69,7 +69,7 @@ spec:
                 items:
                   description: PipelineStep defines one node in the agent DAG.
                   properties:
-                    agentDeployment:
+                    arkonisDeployment:
                       description: ArkonisDeployment is the name of the ArkonisDeployment
                         that executes this step.
                       type: string
@@ -99,7 +99,7 @@ spec:
                         Downstream steps can reference structured fields via "{{ .steps.<name>.data.<field> }}".
                       type: string
                   required:
-                  - agentDeployment
+                  - arkonisDeployment
                   - name
                   type: object
                 minItems: 1

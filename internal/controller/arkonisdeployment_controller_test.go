@@ -173,12 +173,12 @@ var _ = Describe("ArkonisDeployment Controller", func() {
 
 	Context("When an ArkonisDeployment references an ArkonisMemory", func() {
 		const (
-			agentName = "mem-agent"
-			memName   = "test-mem"
+			arkonisName = "mem-agent"
+			memName     = "test-mem"
 		)
-		agentKey := types.NamespacedName{Name: agentName, Namespace: namespace}
+		arkonisKey := types.NamespacedName{Name: arkonisName, Namespace: namespace}
 		memKey := types.NamespacedName{Name: memName, Namespace: namespace}
-		backingKey := types.NamespacedName{Name: agentName + "-agent", Namespace: namespace}
+		backingKey := types.NamespacedName{Name: arkonisName + "-agent", Namespace: namespace}
 
 		BeforeEach(func() {
 			By("creating an ArkonisMemory with redis backend")
@@ -196,7 +196,7 @@ var _ = Describe("ArkonisDeployment Controller", func() {
 			By("creating an ArkonisDeployment that references the ArkonisMemory")
 			replicas := int32(1)
 			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisDeployment{
-				ObjectMeta: metav1.ObjectMeta{Name: agentName, Namespace: namespace},
+				ObjectMeta: metav1.ObjectMeta{Name: arkonisName, Namespace: namespace},
 				Spec: arkonisv1alpha1.ArkonisDeploymentSpec{
 					Replicas:     &replicas,
 					Model:        "claude-haiku-4-5",
@@ -208,7 +208,7 @@ var _ = Describe("ArkonisDeployment Controller", func() {
 
 		AfterEach(func() {
 			ad := &arkonisv1alpha1.ArkonisDeployment{}
-			if err := k8sClient.Get(ctx, agentKey, ad); err == nil {
+			if err := k8sClient.Get(ctx, arkonisKey, ad); err == nil {
 				Expect(k8sClient.Delete(ctx, ad)).To(Succeed())
 			}
 			mem := &arkonisv1alpha1.ArkonisMemory{}
@@ -227,7 +227,7 @@ var _ = Describe("ArkonisDeployment Controller", func() {
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,
 			}
-			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: agentKey})
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: arkonisKey})
 			Expect(err).NotTo(HaveOccurred())
 
 			dep := &appsv1.Deployment{}
@@ -254,7 +254,7 @@ var _ = Describe("ArkonisDeployment Controller", func() {
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,
 			}
-			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: agentKey})
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: arkonisKey})
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

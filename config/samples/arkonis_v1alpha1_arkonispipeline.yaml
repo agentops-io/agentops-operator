@@ -8,12 +8,12 @@ spec:
     topic: "AI in healthcare"
   steps:
     - name: research
-      agentDeployment: research-agent
+      arkonisDeployment: research-agent
       inputs:
         prompt: "Research the following topic thoroughly: {{ .pipeline.input.topic }}"
 
     - name: summarize
-      agentDeployment: summarizer-agent
+      arkonisDeployment: summarizer-agent
       dependsOn:
         - research
       inputs:

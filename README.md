@@ -14,7 +14,7 @@ arkonis-operator extends Kubernetes with AI agents as first-class resources. Dec
 
 ```bash
 kubectl apply -f research-agent.yaml
-# agentdeployment.arkonis.dev/research-agent created
+# arkonisdeployment.arkonis.dev/research-agent created
 
 kubectl get aodep
 # NAME              MODEL                      REPLICAS   READY   AGE

@@ -17,7 +17,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.selector.agentDeployment
+    - jsonPath: .spec.selector.arkonisDeployment
       name: Deployment
       type: string
     - jsonPath: .spec.routing.strategy
@@ -95,12 +95,12 @@ spec:
                 description: Selector identifies the ArkonisDeployment this service
                   routes tasks to.
                 properties:
-                  agentDeployment:
+                  arkonisDeployment:
                     description: ArkonisDeployment is the name of the ArkonisDeployment
                       to route tasks to.
                     type: string
                 required:
-                - agentDeployment
+                - arkonisDeployment
                 type: object
             required:
             - selector

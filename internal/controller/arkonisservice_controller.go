@@ -41,70 +41,70 @@ type ArkonisServiceReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentservices,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentservices/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentservices/finalizers,verbs=update
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentdeployments,verbs=get;list;watch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisservices/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisservices/finalizers,verbs=update
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisdeployments,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ArkonisServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	agentSvc := &arkonisv1alpha1.ArkonisService{}
-	if err := r.Get(ctx, req.NamespacedName, agentSvc); err != nil {
+	arkonisSvc := &arkonisv1alpha1.ArkonisService{}
+	if err := r.Get(ctx, req.NamespacedName, arkonisSvc); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}
 
-	if !agentSvc.DeletionTimestamp.IsZero() {
+	if !arkonisSvc.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
 
 	// Look up the backing ArkonisDeployment.
-	if agentSvc.Spec.Selector.ArkonisDeployment == "" {
-		r.setCondition(agentSvc, metav1.ConditionFalse, "NoSelector",
-			"spec.selector.agentDeployment is required")
-		_ = r.Status().Update(ctx, agentSvc)
+	if arkonisSvc.Spec.Selector.ArkonisDeployment == "" {
+		r.setCondition(arkonisSvc, metav1.ConditionFalse, "NoSelector",
+			"spec.selector.arkonisDeployment is required")
+		_ = r.Status().Update(ctx, arkonisSvc)
 		return ctrl.Result{}, nil
 	}
-	agentDep := &arkonisv1alpha1.ArkonisDeployment{}
+	arkonisDep := &arkonisv1alpha1.ArkonisDeployment{}
 	if err := r.Get(ctx, client.ObjectKey{
-		Name:      agentSvc.Spec.Selector.ArkonisDeployment,
-		Namespace: agentSvc.Namespace,
-	}, agentDep); err != nil {
+		Name:      arkonisSvc.Spec.Selector.ArkonisDeployment,
+		Namespace: arkonisSvc.Namespace,
+	}, arkonisDep); err != nil {
 		if errors.IsNotFound(err) {
-			logger.Info("ArkonisDeployment not found, requeuing", "name", agentSvc.Spec.Selector.ArkonisDeployment)
-			r.setCondition(agentSvc, metav1.ConditionFalse, "DeploymentNotFound",
+			logger.Info("ArkonisDeployment not found, requeuing", "name", arkonisSvc.Spec.Selector.ArkonisDeployment)
+			r.setCondition(arkonisSvc, metav1.ConditionFalse, "DeploymentNotFound",
 				"referenced ArkonisDeployment does not exist")
-			_ = r.Status().Update(ctx, agentSvc)
+			_ = r.Status().Update(ctx, arkonisSvc)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileService(ctx, agentSvc, agentDep); err != nil {
+	if err := r.reconcileService(ctx, arkonisSvc, arkonisDep); err != nil {
 		logger.Error(err, "failed to reconcile Service")
-		r.setCondition(agentSvc, metav1.ConditionFalse, "ReconcileError", err.Error())
-		_ = r.Status().Update(ctx, agentSvc)
+		r.setCondition(arkonisSvc, metav1.ConditionFalse, "ReconcileError", err.Error())
+		_ = r.Status().Update(ctx, arkonisSvc)
 		return ctrl.Result{}, err
 	}
 
-	agentSvc.Status.ReadyReplicas = agentDep.Status.ReadyReplicas
-	agentSvc.Status.ObservedGeneration = agentSvc.Generation
-	r.setCondition(agentSvc, metav1.ConditionTrue, "Reconciled", "ArkonisService reconciled")
-	return ctrl.Result{}, r.Status().Update(ctx, agentSvc)
+	arkonisSvc.Status.ReadyReplicas = arkonisDep.Status.ReadyReplicas
+	arkonisSvc.Status.ObservedGeneration = arkonisSvc.Generation
+	r.setCondition(arkonisSvc, metav1.ConditionTrue, "Reconciled", "ArkonisService reconciled")
+	return ctrl.Result{}, r.Status().Update(ctx, arkonisSvc)
 }
 
 func (r *ArkonisServiceReconciler) reconcileService(
 	ctx context.Context,
-	agentSvc *arkonisv1alpha1.ArkonisService,
-	agentDep *arkonisv1alpha1.ArkonisDeployment,
+	arkonisSvc *arkonisv1alpha1.ArkonisService,
+	arkonisDep *arkonisv1alpha1.ArkonisDeployment,
 ) error {
-	desired := r.buildService(agentSvc, agentDep)
+	desired := r.buildService(arkonisSvc, arkonisDep)
 
-	if err := ctrl.SetControllerReference(agentSvc, desired, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(arkonisSvc, desired, r.Scheme); err != nil {
 		return err
 	}
 
@@ -124,16 +124,16 @@ func (r *ArkonisServiceReconciler) reconcileService(
 }
 
 func (r *ArkonisServiceReconciler) buildService(
-	agentSvc *arkonisv1alpha1.ArkonisService,
-	agentDep *arkonisv1alpha1.ArkonisDeployment,
+	arkonisSvc *arkonisv1alpha1.ArkonisService,
+	arkonisDep *arkonisv1alpha1.ArkonisDeployment,
 ) *corev1.Service {
 	// Select the pods owned by the referenced ArkonisDeployment.
 	selector := map[string]string{
-		"arkonis.dev/deployment": agentDep.Name,
+		"arkonis.dev/deployment": arkonisDep.Name,
 	}
 
-	ports := make([]corev1.ServicePort, 0, len(agentSvc.Spec.Ports))
-	for _, p := range agentSvc.Spec.Ports {
+	ports := make([]corev1.ServicePort, 0, len(arkonisSvc.Spec.Ports))
+	for _, p := range arkonisSvc.Spec.Ports {
 		ports = append(ports, corev1.ServicePort{
 			Name:       strings.ToLower(string(p.Protocol)),
 			Port:       p.Port,
@@ -153,11 +153,11 @@ func (r *ArkonisServiceReconciler) buildService(
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      agentSvc.Name,
-			Namespace: agentSvc.Namespace,
+			Name:      arkonisSvc.Name,
+			Namespace: arkonisSvc.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": "arkonis-operator",
-				"arkonis.dev/service":          agentSvc.Name,
+				"arkonis.dev/service":          arkonisSvc.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -169,14 +169,14 @@ func (r *ArkonisServiceReconciler) buildService(
 }
 
 func (r *ArkonisServiceReconciler) setCondition(
-	agentSvc *arkonisv1alpha1.ArkonisService,
+	arkonisSvc *arkonisv1alpha1.ArkonisService,
 	status metav1.ConditionStatus,
 	reason, message string,
 ) {
-	apimeta.SetStatusCondition(&agentSvc.Status.Conditions, metav1.Condition{
+	apimeta.SetStatusCondition(&arkonisSvc.Status.Conditions, metav1.Condition{
 		Type:               "Ready",
 		Status:             status,
-		ObservedGeneration: agentSvc.Generation,
+		ObservedGeneration: arkonisSvc.Generation,
 		Reason:             reason,
 		Message:            message,
 	})
@@ -188,19 +188,19 @@ func (r *ArkonisServiceReconciler) findServicesForDeployment(
 	ctx context.Context,
 	obj client.Object,
 ) []reconcile.Request {
-	agentDep, ok := obj.(*arkonisv1alpha1.ArkonisDeployment)
+	arkonisDep, ok := obj.(*arkonisv1alpha1.ArkonisDeployment)
 	if !ok {
 		return nil
 	}
 
 	svcList := &arkonisv1alpha1.ArkonisServiceList{}
-	if err := r.List(ctx, svcList, client.InNamespace(agentDep.Namespace)); err != nil {
+	if err := r.List(ctx, svcList, client.InNamespace(arkonisDep.Namespace)); err != nil {
 		return nil
 	}
 
 	var reqs []reconcile.Request
 	for _, svc := range svcList.Items {
-		if svc.Spec.Selector.ArkonisDeployment == agentDep.Name {
+		if svc.Spec.Selector.ArkonisDeployment == arkonisDep.Name {
 			reqs = append(reqs, reconcile.Request{
 				NamespacedName: client.ObjectKey{Name: svc.Name, Namespace: svc.Namespace},
 			})
@@ -220,6 +220,6 @@ func (r *ArkonisServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&arkonisv1alpha1.ArkonisDeployment{},
 			handler.EnqueueRequestsFromMapFunc(r.findServicesForDeployment),
 		).
-		Named("agentservice").
+		Named("arkonisservice").
 		Complete(r)
 }

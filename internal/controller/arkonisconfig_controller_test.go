@@ -31,7 +31,7 @@ import (
 
 var _ = Describe("ArkonisConfig Controller", func() {
 	const (
-		resourceName = "test-agentconfig"
+		resourceName = "test-arkonisconfig"
 		namespace    = "default"
 	)
 

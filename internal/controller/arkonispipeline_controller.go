@@ -53,10 +53,10 @@ type ArkonisPipelineReconciler struct {
 	rdb       *redis.Client
 }
 
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentpipelines,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentpipelines/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentpipelines/finalizers,verbs=update
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentdeployments,verbs=get;list;watch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonispipelines,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonispipelines/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonispipelines/finalizers,verbs=update
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisdeployments,verbs=get;list;watch
 
 func (r *ArkonisPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -442,6 +442,6 @@ func (r *ArkonisPipelineReconciler) setCondition(
 func (r *ArkonisPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&arkonisv1alpha1.ArkonisPipeline{}).
-		Named("agentpipeline").
+		Named("arkonispipeline").
 		Complete(r)
 }

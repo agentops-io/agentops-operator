@@ -35,42 +35,42 @@ type ArkonisConfigReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=arkonis.dev,resources=agentconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=arkonisconfigs/finalizers,verbs=update
 
 // ArkonisConfig is a storage-only resource (analogous to ConfigMap).
 // The reconciler just acknowledges the resource and sets a Ready condition.
 // ArkonisDeployments reference it by name; the operator reads it during pod construction.
 func (r *ArkonisConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	agentCfg := &arkonisv1alpha1.ArkonisConfig{}
-	if err := r.Get(ctx, req.NamespacedName, agentCfg); err != nil {
+	arkonisCfg := &arkonisv1alpha1.ArkonisConfig{}
+	if err := r.Get(ctx, req.NamespacedName, arkonisCfg); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}
 
-	if !agentCfg.DeletionTimestamp.IsZero() {
+	if !arkonisCfg.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
 
-	agentCfg.Status.ObservedGeneration = agentCfg.Generation
-	apimeta.SetStatusCondition(&agentCfg.Status.Conditions, metav1.Condition{
+	arkonisCfg.Status.ObservedGeneration = arkonisCfg.Generation
+	apimeta.SetStatusCondition(&arkonisCfg.Status.Conditions, metav1.Condition{
 		Type:               "Ready",
 		Status:             metav1.ConditionTrue,
-		ObservedGeneration: agentCfg.Generation,
+		ObservedGeneration: arkonisCfg.Generation,
 		Reason:             "Accepted",
 		Message:            "ArkonisConfig is valid and available",
 	})
 
-	return ctrl.Result{}, r.Status().Update(ctx, agentCfg)
+	return ctrl.Result{}, r.Status().Update(ctx, arkonisCfg)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ArkonisConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&arkonisv1alpha1.ArkonisConfig{}).
-		Named("agentconfig").
+		Named("arkonisconfig").
 		Complete(r)
 }

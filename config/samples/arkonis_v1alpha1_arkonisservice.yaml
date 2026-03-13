@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   selector:
-    agentDeployment: research-agent
+    arkonisDeployment: research-agent
   routing:
     strategy: least-busy
   ports:

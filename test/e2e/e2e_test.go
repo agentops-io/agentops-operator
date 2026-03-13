@@ -271,7 +271,7 @@ var _ = Describe("Manager", Ordered, func() {
 		// +kubebuilder:scaffold:e2e-webhooks-checks
 
 		It("should reconcile an ArkonisDeployment and create a backing Deployment", func() {
-			const agentDepName = "e2e-research-agent"
+			const arkonisDepName = "e2e-research-agent"
 
 			By("applying a sample ArkonisDeployment CR")
 			sampleYAML := fmt.Sprintf(`
@@ -284,8 +284,8 @@ spec:
   replicas: 1
   model: claude-haiku-4-5-20251001
   systemPrompt: "You are a research agent."
-`, agentDepName, namespace)
-			sampleFile := filepath.Join(os.TempDir(), "e2e-agentdeployment.yaml")
+`, arkonisDepName, namespace)
+			sampleFile := filepath.Join(os.TempDir(), "e2e-arkonisdeployment.yaml")
 			Expect(os.WriteFile(sampleFile, []byte(sampleYAML), 0o644)).To(Succeed())
 
 			cmd := exec.Command("kubectl", "apply", "-f", sampleFile)
@@ -295,33 +295,33 @@ spec:
 			By("waiting for the backing k8s Deployment to be created")
 			verifyDeploymentCreated := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "deployment",
-					agentDepName+"-agent", "-n", namespace,
+					arkonisDepName+"-agent", "-n", namespace,
 					"-o", "jsonpath={.metadata.name}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal(agentDepName + "-agent"))
+				g.Expect(output).To(Equal(arkonisDepName + "-agent"))
 			}
 			Eventually(verifyDeploymentCreated).Should(Succeed())
 
-			By("verifying the reconcile success metric is non-zero for agentdeployment")
+			By("verifying the reconcile success metric is non-zero for arkonisdeployment")
 			verifyReconcileMetric := func(g Gomega) {
 				metricsOutput, err := getMetricsOutput()
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(metricsOutput).To(ContainSubstring(
-					`controller_runtime_reconcile_total{controller="agentdeployment"`,
+					`controller_runtime_reconcile_total{controller="arkonisdeployment"`,
 				))
 			}
 			Eventually(verifyReconcileMetric).Should(Succeed())
 
 			By("cleaning up the ArkonisDeployment")
-			cmd = exec.Command("kubectl", "delete", "agentdeployment", agentDepName, "-n", namespace)
+			cmd = exec.Command("kubectl", "delete", "arkonisdeployment", arkonisDepName, "-n", namespace)
 			_, _ = utils.Run(cmd)
 		})
 
 		It("should reconcile an ArkonisService and create a backing k8s Service", func() {
 			const (
-				agentDepName = "e2e-service-backing-agent"
-				agentSvcName = "e2e-agent-service"
+				arkonisDepName = "e2e-service-backing-agent"
+				arkonisSvcName = "e2e-arkonis-service"
 			)
 
 			By("creating a backing ArkonisDeployment")
@@ -335,7 +335,7 @@ spec:
   replicas: 1
   model: claude-haiku-4-5-20251001
   systemPrompt: "You are helpful."
-`, agentDepName, namespace)
+`, arkonisDepName, namespace)
 			depFile := filepath.Join(os.TempDir(), "e2e-svc-dep.yaml")
 			Expect(os.WriteFile(depFile, []byte(depYAML), 0o644)).To(Succeed())
 			cmd := exec.Command("kubectl", "apply", "-f", depFile)
@@ -351,14 +351,14 @@ metadata:
   namespace: %s
 spec:
   selector:
-    agentDeployment: %s
+    arkonisDeployment: %s
   routing:
     strategy: round-robin
   ports:
     - protocol: HTTP
       port: 8081
-`, agentSvcName, namespace, agentDepName)
-			svcFile := filepath.Join(os.TempDir(), "e2e-agentservice.yaml")
+`, arkonisSvcName, namespace, arkonisDepName)
+			svcFile := filepath.Join(os.TempDir(), "e2e-arkonisservice.yaml")
 			Expect(os.WriteFile(svcFile, []byte(svcYAML), 0o644)).To(Succeed())
 			cmd = exec.Command("kubectl", "apply", "-f", svcFile)
 			_, err = utils.Run(cmd)
@@ -367,18 +367,18 @@ spec:
 			By("waiting for the backing k8s Service to be created")
 			verifyServiceCreated := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "service",
-					agentSvcName, "-n", namespace,
+					arkonisSvcName, "-n", namespace,
 					"-o", "jsonpath={.metadata.name}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal(agentSvcName))
+				g.Expect(output).To(Equal(arkonisSvcName))
 			}
 			Eventually(verifyServiceCreated).Should(Succeed())
 
 			By("cleaning up")
-			cmd = exec.Command("kubectl", "delete", "agentservice", agentSvcName, "-n", namespace)
+			cmd = exec.Command("kubectl", "delete", "arkonisservice", arkonisSvcName, "-n", namespace)
 			_, _ = utils.Run(cmd)
-			cmd = exec.Command("kubectl", "delete", "agentdeployment", agentDepName, "-n", namespace)
+			cmd = exec.Command("kubectl", "delete", "arkonisdeployment", arkonisDepName, "-n", namespace)
 			_, _ = utils.Run(cmd)
 		})
 	})

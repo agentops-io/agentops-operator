@@ -95,14 +95,14 @@ dev: manifests generate kustomize ## Start a local dev environment in Kind. Usag
 	@echo "==> Creating API key secret..."
 	$(KUBECTL) create secret generic arkonis-api-keys \
 		--from-literal=ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
-		--from-literal=TASK_QUEUE_URL=redis.agent-infra.svc.cluster.local:6379 \
+		--from-literal=TASK_QUEUE_URL=redis.arkonis-infra.svc.cluster.local:6379 \
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 	@echo "==> Waiting for operator to be ready..."
 	$(KUBECTL) wait --for=condition=available --timeout=120s \
 		deployment/arkonis-controller-manager -n arkonis-system
 	@echo ""
 	@echo "Dev environment ready."
-	@echo "  kubectl apply -f config/samples/arkonis_v1alpha1_agentdeployment.yaml"
+	@echo "  kubectl apply -f config/samples/arkonis_v1alpha1_arkonisdeployment.yaml"
 	@echo "  kubectl get aodep -w"
 	@echo ""
 	@echo "Tear down: make dev-down"

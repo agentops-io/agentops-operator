@@ -51,7 +51,7 @@ type PipelineStep struct {
 
 	// ArkonisDeployment is the name of the ArkonisDeployment that executes this step.
 	// +kubebuilder:validation:Required
-	ArkonisDeployment string `json:"agentDeployment"`
+	ArkonisDeployment string `json:"arkonisDeployment"`
 
 	// Inputs is a map of input key → Go template expression referencing pipeline
 	// inputs or earlier step outputs. Example: "{{ .steps.research.output }}"

@@ -73,7 +73,7 @@ type ArkonisServiceSpec struct {
 type ArkonisServiceSelector struct {
 	// ArkonisDeployment is the name of the ArkonisDeployment to route tasks to.
 	// +kubebuilder:validation:Required
-	ArkonisDeployment string `json:"agentDeployment"`
+	ArkonisDeployment string `json:"arkonisDeployment"`
 }
 
 // ArkonisServiceStatus defines the observed state of ArkonisService.
@@ -90,7 +90,7 @@ type ArkonisServiceStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Deployment",type=string,JSONPath=`.spec.selector.agentDeployment`
+// +kubebuilder:printcolumn:name="Deployment",type=string,JSONPath=`.spec.selector.arkonisDeployment`
 // +kubebuilder:printcolumn:name="Strategy",type=string,JSONPath=`.spec.routing.strategy`
 // +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`

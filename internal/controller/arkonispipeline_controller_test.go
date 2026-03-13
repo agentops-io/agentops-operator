@@ -122,14 +122,14 @@ var _ = Describe("ArkonisPipeline Controller", func() {
 	})
 
 	Context("When the pipeline is valid but no Redis is configured", func() {
-		const agentDepName = "pipeline-agent"
-		agentDepKey := types.NamespacedName{Name: agentDepName, Namespace: namespace}
+		const arkonisDepName = "pipeline-agent"
+		arkonisDepKey := types.NamespacedName{Name: arkonisDepName, Namespace: namespace}
 
 		BeforeEach(func() {
 			By("creating the ArkonisDeployment the pipeline references")
 			replicas := int32(1)
 			dep := &arkonisv1alpha1.ArkonisDeployment{
-				ObjectMeta: metav1.ObjectMeta{Name: agentDepName, Namespace: namespace},
+				ObjectMeta: metav1.ObjectMeta{Name: arkonisDepName, Namespace: namespace},
 				Spec: arkonisv1alpha1.ArkonisDeploymentSpec{
 					Replicas:     &replicas,
 					Model:        "claude-haiku-4-5",
@@ -148,7 +148,7 @@ var _ = Describe("ArkonisPipeline Controller", func() {
 					Steps: []arkonisv1alpha1.PipelineStep{
 						{
 							Name:              "research",
-							ArkonisDeployment: agentDepName,
+							ArkonisDeployment: arkonisDepName,
 						},
 					},
 				},
@@ -158,7 +158,7 @@ var _ = Describe("ArkonisPipeline Controller", func() {
 
 		AfterEach(func() {
 			dep := &arkonisv1alpha1.ArkonisDeployment{}
-			if err := k8sClient.Get(ctx, agentDepKey, dep); err == nil {
+			if err := k8sClient.Get(ctx, arkonisDepKey, dep); err == nil {
 				Expect(k8sClient.Delete(ctx, dep)).To(Succeed())
 			}
 		})
