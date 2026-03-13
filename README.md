@@ -1,6 +1,6 @@
 # agentops-operator
 
-> Kubernetes-native AI agent infrastructure. Deploy, scale, and manage LLM agents the same way you manage any other workload.
+> Kubernetes-native AI agent infrastructure. Deploy, scale, and manage agentic workloads the same way you manage any other workload.
 
 [![GitHub release](https://img.shields.io/github/v/release/agentops-io/agentops-operator)](https://github.com/agentops-io/agentops-operator/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
