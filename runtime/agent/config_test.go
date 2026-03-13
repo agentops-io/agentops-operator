@@ -93,9 +93,9 @@ func TestLoadConfig_MCPServers(t *testing.T) {
 }
 
 func TestLoadConfig_MissingRequired(t *testing.T) {
-	os.Unsetenv("AGENT_MODEL")
-	os.Unsetenv("AGENT_SYSTEM_PROMPT")
-	os.Unsetenv("TASK_QUEUE_URL")
+	_ = os.Unsetenv("AGENT_MODEL")
+	_ = os.Unsetenv("AGENT_SYSTEM_PROMPT")
+	_ = os.Unsetenv("TASK_QUEUE_URL")
 
 	_, err := LoadConfig()
 	if err == nil {
