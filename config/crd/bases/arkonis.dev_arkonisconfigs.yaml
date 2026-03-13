@@ -4,36 +4,32 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: agentservices.agentops.agentops.io
+  name: arkonisconfigs.arkonis.dev
 spec:
-  group: agentops.agentops.io
+  group: arkonis.dev
   names:
-    kind: AgentService
-    listKind: AgentServiceList
-    plural: agentservices
+    kind: ArkonisConfig
+    listKind: ArkonisConfigList
+    plural: arkonisconfigs
     shortNames:
-    - agsvc
-    singular: agentservice
+    - aocfg
+    singular: arkonisconfig
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.selector.agentDeployment
-      name: Deployment
+    - jsonPath: .spec.memoryBackend
+      name: Memory
       type: string
-    - jsonPath: .spec.routing.strategy
-      name: Strategy
+    - jsonPath: .spec.outputFormat
+      name: OutputFormat
       type: string
-    - jsonPath: .status.readyReplicas
-      name: Ready
-      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AgentService routes incoming tasks to a pool of AgentDeployment
-          replicas.
+        description: ArkonisConfig holds shared configuration consumed by ArkonisDeployments.
         properties:
           apiVersion:
             description: |-
@@ -53,63 +49,42 @@ spec:
           metadata:
             type: object
           spec:
-            description: AgentServiceSpec defines the desired state of AgentService.
+            description: ArkonisConfigSpec defines the shared configuration values.
             properties:
-              ports:
-                description: Ports lists the network ports exposed by this service.
-                items:
-                  description: AgentServicePort defines a port exposed by the AgentService.
-                  properties:
-                    port:
-                      description: Port is the network port number.
-                      format: int32
-                      maximum: 65535
-                      minimum: 1
-                      type: integer
-                    protocol:
-                      description: 'Protocol is the communication protocol: "A2A"
-                        (agent-to-agent) or "HTTP" (external).'
-                      enum:
-                      - A2A
-                      - HTTP
-                      type: string
-                  required:
-                  - port
-                  - protocol
-                  type: object
-                type: array
-              routing:
-                description: Routing configures how incoming tasks are distributed.
+              memoryBackend:
+                default: in-context
+                description: MemoryBackend defines where agent memory is stored.
+                enum:
+                - in-context
+                - vector-store
+                - redis
+                type: string
+              outputFormat:
+                description: OutputFormat specifies the expected output format (e.g.
+                  "structured-json").
+                type: string
+              promptFragments:
+                description: PromptFragments holds reusable prompt snippets.
                 properties:
-                  strategy:
-                    default: round-robin
-                    description: Strategy controls how tasks are distributed across
-                      agent replicas.
-                    enum:
-                    - round-robin
-                    - least-busy
-                    - random
+                  outputRules:
+                    description: OutputRules defines output format constraints appended
+                      to the system prompt.
+                    type: string
+                  persona:
+                    description: Persona is a persona/role description prepended to
+                      the system prompt.
                     type: string
                 type: object
-              selector:
-                description: Selector identifies the AgentDeployment this service
-                  routes tasks to.
-                properties:
-                  agentDeployment:
-                    description: AgentDeployment is the name of the AgentDeployment
-                      to route tasks to.
-                    type: string
-                required:
-                - agentDeployment
-                type: object
-            required:
-            - selector
+              temperature:
+                description: Temperature controls response randomness (0.0–1.0).
+                pattern: ^(0(\.[0-9]+)?|1(\.0+)?)$
+                type: string
             type: object
           status:
-            description: AgentServiceStatus defines the observed state of AgentService.
+            description: ArkonisConfigStatus defines the observed state of ArkonisConfig.
             properties:
               conditions:
-                description: Conditions reflect the current state of the AgentService.
+                description: Conditions reflect the current state of the ArkonisConfig.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -172,11 +147,6 @@ spec:
                 description: ObservedGeneration is the .metadata.generation this status
                   reflects.
                 format: int64
-                type: integer
-              readyReplicas:
-                description: ReadyReplicas is the number of ready agent replicas currently
-                  backing this service.
-                format: int32
                 type: integer
             type: object
         required:

@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: agentpipelines.agentops.agentops.io
+  name: arkonispipelines.arkonis.dev
 spec:
-  group: agentops.agentops.io
+  group: arkonis.dev
   names:
-    kind: AgentPipeline
-    listKind: AgentPipelineList
-    plural: agentpipelines
+    kind: ArkonisPipeline
+    listKind: ArkonisPipelineList
+    plural: arkonispipelines
     shortNames:
-    - agpipe
-    singular: agentpipeline
+    - aopipe
+    singular: arkonispipeline
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -29,7 +29,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AgentPipeline defines a DAG of agent steps where outputs feed
+        description: ArkonisPipeline defines a DAG of agent steps where outputs feed
           into inputs.
         properties:
           apiVersion:
@@ -50,7 +50,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: AgentPipelineSpec defines the desired state of AgentPipeline.
+            description: ArkonisPipelineSpec defines the desired state of ArkonisPipeline.
             properties:
               input:
                 additionalProperties:
@@ -70,7 +70,7 @@ spec:
                   description: PipelineStep defines one node in the agent DAG.
                   properties:
                     agentDeployment:
-                      description: AgentDeployment is the name of the AgentDeployment
+                      description: ArkonisDeployment is the name of the ArkonisDeployment
                         that executes this step.
                       type: string
                     dependsOn:
@@ -108,14 +108,14 @@ spec:
             - steps
             type: object
           status:
-            description: AgentPipelineStatus defines the observed state of AgentPipeline.
+            description: ArkonisPipelineStatus defines the observed state of ArkonisPipeline.
             properties:
               completionTime:
                 description: CompletionTime is when the pipeline finished.
                 format: date-time
                 type: string
               conditions:
-                description: Conditions reflect the current state of the AgentPipeline.
+                description: Conditions reflect the current state of the ArkonisPipeline.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.

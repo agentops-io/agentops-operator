@@ -1,7 +1,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # Image URL for the agent runtime (runs inside agent pods)
-AGENT_IMG ?= agentops-runtime:latest
+AGENT_IMG ?= arkonis-runtime:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -67,9 +67,9 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
-DEV_CLUSTER  ?= agentops-dev
-DEV_IMG      ?= agentops-operator:dev
-DEV_AGENT_IMG ?= agentops-runtime:dev
+DEV_CLUSTER  ?= arkonis-dev
+DEV_IMG      ?= arkonis-operator:dev
+DEV_AGENT_IMG ?= arkonis-runtime:dev
 
 .PHONY: dev
 dev: manifests generate kustomize ## Start a local dev environment in Kind. Usage: make dev ANTHROPIC_API_KEY=sk-ant-...
@@ -93,17 +93,17 @@ dev: manifests generate kustomize ## Start a local dev environment in Kind. Usag
 	@echo "==> Deploying operator..."
 	"$(KUSTOMIZE)" build config/dev | $(KUBECTL) apply -f -
 	@echo "==> Creating API key secret..."
-	$(KUBECTL) create secret generic agentops-operator-api-keys \
+	$(KUBECTL) create secret generic arkonis-api-keys \
 		--from-literal=ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
 		--from-literal=TASK_QUEUE_URL=redis.agent-infra.svc.cluster.local:6379 \
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 	@echo "==> Waiting for operator to be ready..."
 	$(KUBECTL) wait --for=condition=available --timeout=120s \
-		deployment/agentops-controller-manager -n agentops-system
+		deployment/arkonis-controller-manager -n arkonis-system
 	@echo ""
 	@echo "Dev environment ready."
-	@echo "  kubectl apply -f config/samples/agentops_v1alpha1_agentdeployment.yaml"
-	@echo "  kubectl get agdep -w"
+	@echo "  kubectl apply -f config/samples/arkonis_v1alpha1_agentdeployment.yaml"
+	@echo "  kubectl get aodep -w"
 	@echo ""
 	@echo "Tear down: make dev-down"
 
@@ -111,7 +111,7 @@ dev: manifests generate kustomize ## Start a local dev environment in Kind. Usag
 dev-down: ## Tear down the local dev Kind cluster.
 	$(KIND) delete cluster --name $(DEV_CLUSTER)
 
-KIND_CLUSTER ?= agentops-test-e2e
+KIND_CLUSTER ?= arkonis-test-e2e
 
 .PHONY: setup-test-e2e
 setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
@@ -188,10 +188,10 @@ PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name agentops-builder
-	$(CONTAINER_TOOL) buildx use agentops-builder
+	- $(CONTAINER_TOOL) buildx create --name arkonis-builder
+	$(CONTAINER_TOOL) buildx use arkonis-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm agentops-builder
+	- $(CONTAINER_TOOL) buildx rm arkonis-builder
 	rm Dockerfile.cross
 
 .PHONY: build-installer

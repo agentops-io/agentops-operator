@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
-var _ = Describe("AgentConfig Controller", func() {
+var _ = Describe("ArkonisConfig Controller", func() {
 	const (
 		resourceName = "test-agentconfig"
 		namespace    = "default"
@@ -39,16 +39,16 @@ var _ = Describe("AgentConfig Controller", func() {
 	namespacedName := types.NamespacedName{Name: resourceName, Namespace: namespace}
 
 	AfterEach(func() {
-		cfg := &agentopsv1alpha1.AgentConfig{}
+		cfg := &arkonisv1alpha1.ArkonisConfig{}
 		if err := k8sClient.Get(ctx, namespacedName, cfg); err == nil {
 			Expect(k8sClient.Delete(ctx, cfg)).To(Succeed())
 		}
 	})
 
-	Context("When reconciling a minimal AgentConfig", func() {
+	Context("When reconciling a minimal ArkonisConfig", func() {
 		BeforeEach(func() {
-			By("creating an AgentConfig with no spec fields set")
-			resource := &agentopsv1alpha1.AgentConfig{
+			By("creating an ArkonisConfig with no spec fields set")
+			resource := &arkonisv1alpha1.ArkonisConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
@@ -59,12 +59,12 @@ var _ = Describe("AgentConfig Controller", func() {
 
 		It("should set Ready=True with reason Accepted", func() {
 			By("running the reconciler")
-			r := &AgentConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+			r := &ArkonisConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("fetching the updated status")
-			cfg := &agentopsv1alpha1.AgentConfig{}
+			cfg := &arkonisv1alpha1.ArkonisConfig{}
 			Expect(k8sClient.Get(ctx, namespacedName, cfg)).To(Succeed())
 
 			cond := apimeta.FindStatusCondition(cfg.Status.Conditions, "Ready")
@@ -75,29 +75,29 @@ var _ = Describe("AgentConfig Controller", func() {
 
 		It("should set ObservedGeneration to match the resource generation", func() {
 			By("running the reconciler")
-			r := &AgentConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+			r := &ArkonisConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			cfg := &agentopsv1alpha1.AgentConfig{}
+			cfg := &arkonisv1alpha1.ArkonisConfig{}
 			Expect(k8sClient.Get(ctx, namespacedName, cfg)).To(Succeed())
 			Expect(cfg.Status.ObservedGeneration).To(Equal(cfg.Generation))
 		})
 	})
 
-	Context("When reconciling an AgentConfig with spec values", func() {
+	Context("When reconciling an ArkonisConfig with spec values", func() {
 		BeforeEach(func() {
-			By("creating an AgentConfig with temperature, outputFormat, and prompt fragments")
-			resource := &agentopsv1alpha1.AgentConfig{
+			By("creating an ArkonisConfig with temperature, outputFormat, and prompt fragments")
+			resource := &arkonisv1alpha1.ArkonisConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: agentopsv1alpha1.AgentConfigSpec{
+				Spec: arkonisv1alpha1.ArkonisConfigSpec{
 					Temperature:   "0.7",
 					OutputFormat:  "structured-json",
-					MemoryBackend: agentopsv1alpha1.MemoryBackendInContext,
-					PromptFragments: agentopsv1alpha1.PromptFragments{
+					MemoryBackend: arkonisv1alpha1.MemoryBackendInContext,
+					PromptFragments: arkonisv1alpha1.PromptFragments{
 						Persona:     "You are an expert analyst.",
 						OutputRules: "Always cite your sources.",
 					},
@@ -107,11 +107,11 @@ var _ = Describe("AgentConfig Controller", func() {
 		})
 
 		It("should set Ready=True regardless of which spec fields are set", func() {
-			r := &AgentConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+			r := &ArkonisConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			cfg := &agentopsv1alpha1.AgentConfig{}
+			cfg := &arkonisv1alpha1.ArkonisConfig{}
 			Expect(k8sClient.Get(ctx, namespacedName, cfg)).To(Succeed())
 
 			cond := apimeta.FindStatusCondition(cfg.Status.Conditions, "Ready")
@@ -125,9 +125,9 @@ var _ = Describe("AgentConfig Controller", func() {
 		})
 	})
 
-	Context("When reconciling a nonexistent AgentConfig", func() {
+	Context("When reconciling a nonexistent ArkonisConfig", func() {
 		It("should return without error", func() {
-			r := &AgentConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+			r := &ArkonisConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			_, err := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{Name: "does-not-exist", Namespace: namespace},
 			})

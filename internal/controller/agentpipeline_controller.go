@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
 const (
@@ -43,8 +43,8 @@ const (
 	pipelineRequeueIn = 5 * time.Second
 )
 
-// AgentPipelineReconciler reconciles a AgentPipeline object.
-type AgentPipelineReconciler struct {
+// ArkonisPipelineReconciler reconciles a ArkonisPipeline object.
+type ArkonisPipelineReconciler struct {
 	client.Client
 	Scheme       *runtime.Scheme
 	TaskQueueURL string
@@ -53,15 +53,15 @@ type AgentPipelineReconciler struct {
 	rdb       *redis.Client
 }
 
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentpipelines,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentpipelines/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentpipelines/finalizers,verbs=update
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentdeployments,verbs=get;list;watch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentpipelines,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentpipelines/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentpipelines/finalizers,verbs=update
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentdeployments,verbs=get;list;watch
 
-func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ArkonisPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	pipeline := &agentopsv1alpha1.AgentPipeline{}
+	pipeline := &arkonisv1alpha1.ArkonisPipeline{}
 	if err := r.Get(ctx, req.NamespacedName, pipeline); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -73,7 +73,7 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	// Validate DAG and referenced AgentDeployments.
+	// Validate DAG and referenced ArkonisDeployments.
 	if err := r.validateDAG(pipeline); err != nil {
 		logger.Error(err, "invalid pipeline DAG")
 		r.setCondition(pipeline, metav1.ConditionFalse, "InvalidDAG", err.Error())
@@ -81,15 +81,15 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 	if err := r.validateDeployments(ctx, pipeline); err != nil {
-		logger.Info("waiting for AgentDeployments", "reason", err.Error())
+		logger.Info("waiting for ArkonisDeployments", "reason", err.Error())
 		r.setCondition(pipeline, metav1.ConditionFalse, "DeploymentNotFound", err.Error())
 		_ = r.Status().Update(ctx, pipeline)
 		return ctrl.Result{}, nil
 	}
 
 	// Terminal phases — nothing to do.
-	if pipeline.Status.Phase == agentopsv1alpha1.PipelinePhaseSucceeded ||
-		pipeline.Status.Phase == agentopsv1alpha1.PipelinePhaseFailed {
+	if pipeline.Status.Phase == arkonisv1alpha1.PipelinePhaseSucceeded ||
+		pipeline.Status.Phase == arkonisv1alpha1.PipelinePhaseFailed {
 		pipeline.Status.ObservedGeneration = pipeline.Generation
 		return ctrl.Result{}, r.Status().Update(ctx, pipeline)
 	}
@@ -107,7 +107,7 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	r.initializeSteps(pipeline)
 
 	// Build lookup maps for convenient access.
-	statusByName := make(map[string]*agentopsv1alpha1.PipelineStepStatus, len(pipeline.Status.Steps))
+	statusByName := make(map[string]*arkonisv1alpha1.PipelineStepStatus, len(pipeline.Status.Steps))
 	for i := range pipeline.Status.Steps {
 		statusByName[pipeline.Status.Steps[i].Name] = &pipeline.Status.Steps[i]
 	}
@@ -132,25 +132,25 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	if pipeline.Status.Phase == agentopsv1alpha1.PipelinePhaseRunning {
+	if pipeline.Status.Phase == arkonisv1alpha1.PipelinePhaseRunning {
 		return ctrl.Result{RequeueAfter: pipelineRequeueIn}, nil
 	}
 	return ctrl.Result{}, nil
 }
 
 // initializeSteps sets up step statuses and marks the pipeline Running on the first reconcile.
-func (r *AgentPipelineReconciler) initializeSteps(pipeline *agentopsv1alpha1.AgentPipeline) {
+func (r *ArkonisPipelineReconciler) initializeSteps(pipeline *arkonisv1alpha1.ArkonisPipeline) {
 	if pipeline.Status.Phase != "" {
 		return
 	}
 	now := metav1.Now()
-	pipeline.Status.Phase = agentopsv1alpha1.PipelinePhaseRunning
+	pipeline.Status.Phase = arkonisv1alpha1.PipelinePhaseRunning
 	pipeline.Status.StartTime = &now
-	pipeline.Status.Steps = make([]agentopsv1alpha1.PipelineStepStatus, len(pipeline.Spec.Steps))
+	pipeline.Status.Steps = make([]arkonisv1alpha1.PipelineStepStatus, len(pipeline.Spec.Steps))
 	for i, step := range pipeline.Spec.Steps {
-		pipeline.Status.Steps[i] = agentopsv1alpha1.PipelineStepStatus{
+		pipeline.Status.Steps[i] = arkonisv1alpha1.PipelineStepStatus{
 			Name:  step.Name,
-			Phase: agentopsv1alpha1.PipelineStepPhasePending,
+			Phase: arkonisv1alpha1.PipelineStepPhasePending,
 		}
 	}
 	r.setCondition(pipeline, metav1.ConditionTrue, "Validated", "Pipeline DAG is valid; execution started")
@@ -158,9 +158,9 @@ func (r *AgentPipelineReconciler) initializeSteps(pipeline *agentopsv1alpha1.Age
 
 // parseOutputJSON tries to parse completed step outputs as JSON when the step declared an OutputSchema.
 // Parsed results are stored in OutputJSON so downstream templates can reference individual fields.
-func (r *AgentPipelineReconciler) parseOutputJSON(
-	pipeline *agentopsv1alpha1.AgentPipeline,
-	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
+func (r *ArkonisPipelineReconciler) parseOutputJSON(
+	pipeline *arkonisv1alpha1.ArkonisPipeline,
+	statusByName map[string]*arkonisv1alpha1.PipelineStepStatus,
 ) {
 	schemaByName := make(map[string]string, len(pipeline.Spec.Steps))
 	for _, step := range pipeline.Spec.Steps {
@@ -172,7 +172,7 @@ func (r *AgentPipelineReconciler) parseOutputJSON(
 		if _, hasSchema := schemaByName[name]; !hasSchema {
 			continue
 		}
-		if st.Phase != agentopsv1alpha1.PipelineStepPhaseSucceeded || st.Output == "" || st.OutputJSON != "" {
+		if st.Phase != arkonisv1alpha1.PipelineStepPhaseSucceeded || st.Output == "" || st.OutputJSON != "" {
 			continue
 		}
 		var check any
@@ -183,11 +183,11 @@ func (r *AgentPipelineReconciler) parseOutputJSON(
 }
 
 // submitPendingSteps enqueues tasks for every step whose dependencies have all succeeded.
-func (r *AgentPipelineReconciler) submitPendingSteps(
+func (r *ArkonisPipelineReconciler) submitPendingSteps(
 	ctx context.Context,
 	rdb *redis.Client,
-	pipeline *agentopsv1alpha1.AgentPipeline,
-	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
+	pipeline *arkonisv1alpha1.ArkonisPipeline,
+	statusByName map[string]*arkonisv1alpha1.PipelineStepStatus,
 	templateData map[string]any,
 	logger interface {
 		Info(string, ...any)
@@ -196,7 +196,7 @@ func (r *AgentPipelineReconciler) submitPendingSteps(
 ) error {
 	for _, step := range pipeline.Spec.Steps {
 		st := statusByName[step.Name]
-		if st == nil || st.Phase != agentopsv1alpha1.PipelineStepPhasePending {
+		if st == nil || st.Phase != arkonisv1alpha1.PipelineStepPhasePending {
 			continue
 		}
 		if !r.depsSucceeded(step.DependsOn, statusByName) {
@@ -206,7 +206,7 @@ func (r *AgentPipelineReconciler) submitPendingSteps(
 		if err != nil {
 			logger.Error(err, "resolving step inputs", "step", step.Name)
 			now := metav1.Now()
-			st.Phase = agentopsv1alpha1.PipelineStepPhaseFailed
+			st.Phase = arkonisv1alpha1.PipelineStepPhaseFailed
 			st.CompletionTime = &now
 			st.Message = fmt.Sprintf("input template error: %v", err)
 			continue
@@ -218,7 +218,7 @@ func (r *AgentPipelineReconciler) submitPendingSteps(
 			return fmt.Errorf("submitting task for step %q: %w", step.Name, err)
 		}
 		now := metav1.Now()
-		st.Phase = agentopsv1alpha1.PipelineStepPhaseRunning
+		st.Phase = arkonisv1alpha1.PipelineStepPhaseRunning
 		st.TaskID = taskID
 		st.StartTime = &now
 		logger.Info("submitted task", "step", step.Name, "taskID", taskID)
@@ -227,16 +227,16 @@ func (r *AgentPipelineReconciler) submitPendingSteps(
 }
 
 // updatePipelinePhase inspects step statuses and transitions the pipeline to Succeeded or Failed.
-func (r *AgentPipelineReconciler) updatePipelinePhase(
-	pipeline *agentopsv1alpha1.AgentPipeline,
+func (r *ArkonisPipelineReconciler) updatePipelinePhase(
+	pipeline *arkonisv1alpha1.ArkonisPipeline,
 	templateData map[string]any,
 ) {
 	failed, allDone := false, true
 	for _, st := range pipeline.Status.Steps {
 		switch st.Phase {
-		case agentopsv1alpha1.PipelineStepPhaseFailed:
+		case arkonisv1alpha1.PipelineStepPhaseFailed:
 			failed = true
-		case agentopsv1alpha1.PipelineStepPhaseSucceeded:
+		case arkonisv1alpha1.PipelineStepPhaseSucceeded:
 			// ok
 		default:
 			allDone = false
@@ -246,11 +246,11 @@ func (r *AgentPipelineReconciler) updatePipelinePhase(
 	now := metav1.Now()
 	switch {
 	case failed:
-		pipeline.Status.Phase = agentopsv1alpha1.PipelinePhaseFailed
+		pipeline.Status.Phase = arkonisv1alpha1.PipelinePhaseFailed
 		pipeline.Status.CompletionTime = &now
 		r.setCondition(pipeline, metav1.ConditionFalse, "StepFailed", "one or more steps failed")
 	case allDone:
-		pipeline.Status.Phase = agentopsv1alpha1.PipelinePhaseSucceeded
+		pipeline.Status.Phase = arkonisv1alpha1.PipelinePhaseSucceeded
 		pipeline.Status.CompletionTime = &now
 		if pipeline.Spec.Output != "" {
 			out, _ := r.resolveTemplate(pipeline.Spec.Output, templateData)
@@ -261,16 +261,16 @@ func (r *AgentPipelineReconciler) updatePipelinePhase(
 }
 
 // collectResults scans agent-tasks-results for results matching in-flight step task IDs.
-func (r *AgentPipelineReconciler) collectResults(
+func (r *ArkonisPipelineReconciler) collectResults(
 	ctx context.Context,
 	rdb *redis.Client,
-	_ *agentopsv1alpha1.AgentPipeline,
-	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
+	_ *arkonisv1alpha1.ArkonisPipeline,
+	statusByName map[string]*arkonisv1alpha1.PipelineStepStatus,
 ) error {
 	// Build a set of task IDs we're waiting on.
-	waiting := make(map[string]*agentopsv1alpha1.PipelineStepStatus)
+	waiting := make(map[string]*arkonisv1alpha1.PipelineStepStatus)
 	for _, st := range statusByName {
-		if st.Phase == agentopsv1alpha1.PipelineStepPhaseRunning && st.TaskID != "" {
+		if st.Phase == arkonisv1alpha1.PipelineStepPhaseRunning && st.TaskID != "" {
 			waiting[st.TaskID] = st
 		}
 	}
@@ -288,7 +288,7 @@ func (r *AgentPipelineReconciler) collectResults(
 		if st, ok := waiting[taskID]; ok {
 			result, _ := msg.Values["result"].(string)
 			now := metav1.Now()
-			st.Phase = agentopsv1alpha1.PipelineStepPhaseSucceeded
+			st.Phase = arkonisv1alpha1.PipelineStepPhaseSucceeded
 			st.Output = result
 			st.CompletionTime = &now
 		}
@@ -297,7 +297,7 @@ func (r *AgentPipelineReconciler) collectResults(
 }
 
 // submitTask enqueues a task on the shared agent-tasks stream and returns the Redis message ID.
-func (r *AgentPipelineReconciler) submitTask(ctx context.Context, rdb *redis.Client, prompt string) (string, error) {
+func (r *ArkonisPipelineReconciler) submitTask(ctx context.Context, rdb *redis.Client, prompt string) (string, error) {
 	id, err := rdb.XAdd(ctx, &redis.XAddArgs{
 		Stream: taskStream,
 		Values: map[string]any{"prompt": prompt},
@@ -312,9 +312,9 @@ func (r *AgentPipelineReconciler) submitTask(ctx context.Context, rdb *redis.Cli
 // Each step entry exposes:
 //   - .steps.<name>.output  — raw text response
 //   - .steps.<name>.data    — parsed JSON map (only when OutputJSON is populated)
-func (r *AgentPipelineReconciler) buildTemplateData(
-	pipeline *agentopsv1alpha1.AgentPipeline,
-	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
+func (r *ArkonisPipelineReconciler) buildTemplateData(
+	pipeline *arkonisv1alpha1.ArkonisPipeline,
+	statusByName map[string]*arkonisv1alpha1.PipelineStepStatus,
 ) map[string]any {
 	stepsData := make(map[string]any, len(pipeline.Status.Steps))
 	for name, st := range statusByName {
@@ -336,7 +336,7 @@ func (r *AgentPipelineReconciler) buildTemplateData(
 // resolvePrompt resolves all step input templates and concatenates them into a prompt string.
 // When the step has an OutputSchema, the schema is appended as an instruction so the
 // agent knows to respond with JSON matching that shape.
-func (r *AgentPipelineReconciler) resolvePrompt(step agentopsv1alpha1.PipelineStep, data map[string]any) (string, error) {
+func (r *ArkonisPipelineReconciler) resolvePrompt(step arkonisv1alpha1.PipelineStep, data map[string]any) (string, error) {
 	var buf bytes.Buffer
 	for key, tmplStr := range step.Inputs {
 		resolved, err := r.resolveTemplate(tmplStr, data)
@@ -352,7 +352,7 @@ func (r *AgentPipelineReconciler) resolvePrompt(step agentopsv1alpha1.PipelineSt
 }
 
 // resolveTemplate executes a Go template string against the provided data.
-func (r *AgentPipelineReconciler) resolveTemplate(tmplStr string, data map[string]any) (string, error) {
+func (r *ArkonisPipelineReconciler) resolveTemplate(tmplStr string, data map[string]any) (string, error) {
 	t, err := template.New("").Option("missingkey=zero").Parse(tmplStr)
 	if err != nil {
 		return "", err
@@ -365,13 +365,13 @@ func (r *AgentPipelineReconciler) resolveTemplate(tmplStr string, data map[strin
 }
 
 // depsSucceeded returns true when every name in deps is in Succeeded phase.
-func (r *AgentPipelineReconciler) depsSucceeded(
+func (r *ArkonisPipelineReconciler) depsSucceeded(
 	deps []string,
-	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
+	statusByName map[string]*arkonisv1alpha1.PipelineStepStatus,
 ) bool {
 	for _, dep := range deps {
 		st, ok := statusByName[dep]
-		if !ok || st.Phase != agentopsv1alpha1.PipelineStepPhaseSucceeded {
+		if !ok || st.Phase != arkonisv1alpha1.PipelineStepPhaseSucceeded {
 			return false
 		}
 	}
@@ -379,7 +379,7 @@ func (r *AgentPipelineReconciler) depsSucceeded(
 }
 
 // getRedis returns a lazily-initialized Redis client, or nil if no URL is configured.
-func (r *AgentPipelineReconciler) getRedis() *redis.Client {
+func (r *ArkonisPipelineReconciler) getRedis() *redis.Client {
 	r.redisOnce.Do(func() {
 		if r.TaskQueueURL != "" {
 			r.rdb = redis.NewClient(&redis.Options{Addr: r.TaskQueueURL})
@@ -389,7 +389,7 @@ func (r *AgentPipelineReconciler) getRedis() *redis.Client {
 }
 
 // validateDAG checks that every dependsOn entry names a step defined in the spec.
-func (r *AgentPipelineReconciler) validateDAG(pipeline *agentopsv1alpha1.AgentPipeline) error {
+func (r *ArkonisPipelineReconciler) validateDAG(pipeline *arkonisv1alpha1.ArkonisPipeline) error {
 	stepNames := make(map[string]struct{}, len(pipeline.Spec.Steps))
 	for _, step := range pipeline.Spec.Steps {
 		stepNames[step.Name] = struct{}{}
@@ -404,19 +404,19 @@ func (r *AgentPipelineReconciler) validateDAG(pipeline *agentopsv1alpha1.AgentPi
 	return nil
 }
 
-// validateDeployments checks that each step's AgentDeployment exists.
-func (r *AgentPipelineReconciler) validateDeployments(
+// validateDeployments checks that each step's ArkonisDeployment exists.
+func (r *ArkonisPipelineReconciler) validateDeployments(
 	ctx context.Context,
-	pipeline *agentopsv1alpha1.AgentPipeline,
+	pipeline *arkonisv1alpha1.ArkonisPipeline,
 ) error {
 	for _, step := range pipeline.Spec.Steps {
-		dep := &agentopsv1alpha1.AgentDeployment{}
+		dep := &arkonisv1alpha1.ArkonisDeployment{}
 		if err := r.Get(ctx, client.ObjectKey{
-			Name:      step.AgentDeployment,
+			Name:      step.ArkonisDeployment,
 			Namespace: pipeline.Namespace,
 		}, dep); err != nil {
 			if errors.IsNotFound(err) {
-				return fmt.Errorf("step %q references missing AgentDeployment %q", step.Name, step.AgentDeployment)
+				return fmt.Errorf("step %q references missing ArkonisDeployment %q", step.Name, step.ArkonisDeployment)
 			}
 			return err
 		}
@@ -424,8 +424,8 @@ func (r *AgentPipelineReconciler) validateDeployments(
 	return nil
 }
 
-func (r *AgentPipelineReconciler) setCondition(
-	pipeline *agentopsv1alpha1.AgentPipeline,
+func (r *ArkonisPipelineReconciler) setCondition(
+	pipeline *arkonisv1alpha1.ArkonisPipeline,
 	status metav1.ConditionStatus,
 	reason, message string,
 ) {
@@ -439,9 +439,9 @@ func (r *AgentPipelineReconciler) setCondition(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AgentPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ArkonisPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&agentopsv1alpha1.AgentPipeline{}).
+		For(&arkonisv1alpha1.ArkonisPipeline{}).
 		Named("agentpipeline").
 		Complete(r)
 }

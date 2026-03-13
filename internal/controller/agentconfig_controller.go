@@ -26,24 +26,24 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
-// AgentConfigReconciler reconciles a AgentConfig object
-type AgentConfigReconciler struct {
+// ArkonisConfigReconciler reconciles a ArkonisConfig object
+type ArkonisConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentconfigs/finalizers,verbs=update
 
-// AgentConfig is a storage-only resource (analogous to ConfigMap).
+// ArkonisConfig is a storage-only resource (analogous to ConfigMap).
 // The reconciler just acknowledges the resource and sets a Ready condition.
-// AgentDeployments reference it by name; the operator reads it during pod construction.
-func (r *AgentConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	agentCfg := &agentopsv1alpha1.AgentConfig{}
+// ArkonisDeployments reference it by name; the operator reads it during pod construction.
+func (r *ArkonisConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	agentCfg := &arkonisv1alpha1.ArkonisConfig{}
 	if err := r.Get(ctx, req.NamespacedName, agentCfg); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -61,16 +61,16 @@ func (r *AgentConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: agentCfg.Generation,
 		Reason:             "Accepted",
-		Message:            "AgentConfig is valid and available",
+		Message:            "ArkonisConfig is valid and available",
 	})
 
 	return ctrl.Result{}, r.Status().Update(ctx, agentCfg)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AgentConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ArkonisConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&agentopsv1alpha1.AgentConfig{}).
+		For(&arkonisv1alpha1.ArkonisConfig{}).
 		Named("agentconfig").
 		Complete(r)
 }

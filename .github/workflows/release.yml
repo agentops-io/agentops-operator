@@ -7,8 +7,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  OPERATOR_IMAGE: ghcr.io/${{ github.repository_owner }}/agentops-operator
-  AGENT_IMAGE: ghcr.io/${{ github.repository_owner }}/agentops-runtime
+  OPERATOR_IMAGE: ghcr.io/${{ github.repository_owner }}/arkonis-operator
+  AGENT_IMAGE: ghcr.io/${{ github.repository_owner }}/arkonis-runtime
 
 jobs:
   build-operator:
@@ -94,7 +94,7 @@ jobs:
   scan-runtime:
     name: Scan agent runtime image
     runs-on: ubuntu-latest
-    needs: [build-agentops-runtime]
+    needs: [build-arkonis-runtime]
     permissions:
       contents: read
       packages: read
@@ -131,7 +131,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-operator, build-agentops-runtime]
+    needs: [build-operator, build-arkonis-runtime]
     permissions:
       contents: write
       packages: read
@@ -154,7 +154,7 @@ jobs:
           files: dist/install.yaml
           generate_release_notes: true
 
-  build-agentops-runtime:
+  build-arkonis-runtime:
     name: Build and push agent runtime image
     runs-on: ubuntu-latest
     permissions:

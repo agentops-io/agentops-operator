@@ -27,10 +27,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
-var _ = Describe("AgentPipeline Controller", func() {
+var _ = Describe("ArkonisPipeline Controller", func() {
 	const (
 		resourceName = "test-pipeline"
 		namespace    = "default"
@@ -40,7 +40,7 @@ var _ = Describe("AgentPipeline Controller", func() {
 	namespacedName := types.NamespacedName{Name: resourceName, Namespace: namespace}
 
 	AfterEach(func() {
-		pipeline := &agentopsv1alpha1.AgentPipeline{}
+		pipeline := &arkonisv1alpha1.ArkonisPipeline{}
 		if err := k8sClient.Get(ctx, namespacedName, pipeline); err == nil {
 			Expect(k8sClient.Delete(ctx, pipeline)).To(Succeed())
 		}
@@ -49,17 +49,17 @@ var _ = Describe("AgentPipeline Controller", func() {
 	Context("When a step references an unknown dependency (invalid DAG)", func() {
 		BeforeEach(func() {
 			By("creating a pipeline where a step depends on a step that does not exist")
-			resource := &agentopsv1alpha1.AgentPipeline{
+			resource := &arkonisv1alpha1.ArkonisPipeline{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: agentopsv1alpha1.AgentPipelineSpec{
-					Steps: []agentopsv1alpha1.PipelineStep{
+				Spec: arkonisv1alpha1.ArkonisPipelineSpec{
+					Steps: []arkonisv1alpha1.PipelineStep{
 						{
-							Name:            "summarize",
-							AgentDeployment: "summarizer-agent",
-							DependsOn:       []string{"nonexistent-step"},
+							Name:              "summarize",
+							ArkonisDeployment: "summarizer-agent",
+							DependsOn:         []string{"nonexistent-step"},
 						},
 					},
 				},
@@ -69,12 +69,12 @@ var _ = Describe("AgentPipeline Controller", func() {
 
 		It("should set Ready=False with reason InvalidDAG", func() {
 			By("running the reconciler")
-			r := &AgentPipelineReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+			r := &ArkonisPipelineReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("fetching the updated pipeline status")
-			pipeline := &agentopsv1alpha1.AgentPipeline{}
+			pipeline := &arkonisv1alpha1.ArkonisPipeline{}
 			Expect(k8sClient.Get(ctx, namespacedName, pipeline)).To(Succeed())
 
 			cond := apimeta.FindStatusCondition(pipeline.Status.Conditions, "Ready")
@@ -85,19 +85,19 @@ var _ = Describe("AgentPipeline Controller", func() {
 		})
 	})
 
-	Context("When the referenced AgentDeployment is missing", func() {
+	Context("When the referenced ArkonisDeployment is missing", func() {
 		BeforeEach(func() {
-			By("creating an AgentPipeline referencing a nonexistent AgentDeployment")
-			resource := &agentopsv1alpha1.AgentPipeline{
+			By("creating an ArkonisPipeline referencing a nonexistent ArkonisDeployment")
+			resource := &arkonisv1alpha1.ArkonisPipeline{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: agentopsv1alpha1.AgentPipelineSpec{
-					Steps: []agentopsv1alpha1.PipelineStep{
+				Spec: arkonisv1alpha1.ArkonisPipelineSpec{
+					Steps: []arkonisv1alpha1.PipelineStep{
 						{
-							Name:            "research",
-							AgentDeployment: "research-agent",
+							Name:              "research",
+							ArkonisDeployment: "research-agent",
 						},
 					},
 				},
@@ -107,11 +107,11 @@ var _ = Describe("AgentPipeline Controller", func() {
 
 		It("should set Ready=False with reason DeploymentNotFound", func() {
 			By("running the reconciler")
-			r := &AgentPipelineReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+			r := &ArkonisPipelineReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			pipeline := &agentopsv1alpha1.AgentPipeline{}
+			pipeline := &arkonisv1alpha1.ArkonisPipeline{}
 			Expect(k8sClient.Get(ctx, namespacedName, pipeline)).To(Succeed())
 
 			cond := apimeta.FindStatusCondition(pipeline.Status.Conditions, "Ready")
@@ -126,11 +126,11 @@ var _ = Describe("AgentPipeline Controller", func() {
 		agentDepKey := types.NamespacedName{Name: agentDepName, Namespace: namespace}
 
 		BeforeEach(func() {
-			By("creating the AgentDeployment the pipeline references")
+			By("creating the ArkonisDeployment the pipeline references")
 			replicas := int32(1)
-			dep := &agentopsv1alpha1.AgentDeployment{
+			dep := &arkonisv1alpha1.ArkonisDeployment{
 				ObjectMeta: metav1.ObjectMeta{Name: agentDepName, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentDeploymentSpec{
+				Spec: arkonisv1alpha1.ArkonisDeploymentSpec{
 					Replicas:     &replicas,
 					Model:        "claude-haiku-4-5",
 					SystemPrompt: "You are helpful.",
@@ -138,17 +138,17 @@ var _ = Describe("AgentPipeline Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, dep)).To(Succeed())
 
-			By("creating the AgentPipeline with a valid step")
-			resource := &agentopsv1alpha1.AgentPipeline{
+			By("creating the ArkonisPipeline with a valid step")
+			resource := &arkonisv1alpha1.ArkonisPipeline{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: agentopsv1alpha1.AgentPipelineSpec{
-					Steps: []agentopsv1alpha1.PipelineStep{
+				Spec: arkonisv1alpha1.ArkonisPipelineSpec{
+					Steps: []arkonisv1alpha1.PipelineStep{
 						{
-							Name:            "research",
-							AgentDeployment: agentDepName,
+							Name:              "research",
+							ArkonisDeployment: agentDepName,
 						},
 					},
 				},
@@ -157,7 +157,7 @@ var _ = Describe("AgentPipeline Controller", func() {
 		})
 
 		AfterEach(func() {
-			dep := &agentopsv1alpha1.AgentDeployment{}
+			dep := &arkonisv1alpha1.ArkonisDeployment{}
 			if err := k8sClient.Get(ctx, agentDepKey, dep); err == nil {
 				Expect(k8sClient.Delete(ctx, dep)).To(Succeed())
 			}
@@ -165,7 +165,7 @@ var _ = Describe("AgentPipeline Controller", func() {
 
 		It("should set Ready=False with reason NoTaskQueue", func() {
 			By("running the reconciler with no TaskQueueURL set")
-			r := &AgentPipelineReconciler{
+			r := &ArkonisPipelineReconciler{
 				Client:       k8sClient,
 				Scheme:       k8sClient.Scheme(),
 				TaskQueueURL: "", // no Redis
@@ -173,7 +173,7 @@ var _ = Describe("AgentPipeline Controller", func() {
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			pipeline := &agentopsv1alpha1.AgentPipeline{}
+			pipeline := &arkonisv1alpha1.ArkonisPipeline{}
 			Expect(k8sClient.Get(ctx, namespacedName, pipeline)).To(Succeed())
 
 			cond := apimeta.FindStatusCondition(pipeline.Status.Conditions, "Ready")
@@ -183,9 +183,9 @@ var _ = Describe("AgentPipeline Controller", func() {
 		})
 	})
 
-	Context("When reconciling a nonexistent AgentPipeline", func() {
+	Context("When reconciling a nonexistent ArkonisPipeline", func() {
 		It("should return without error", func() {
-			r := &AgentPipelineReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+			r := &ArkonisPipelineReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			_, err := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{Name: "does-not-exist", Namespace: namespace},
 			})

@@ -49,9 +49,9 @@ type PipelineStep struct {
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
-	// AgentDeployment is the name of the AgentDeployment that executes this step.
+	// ArkonisDeployment is the name of the ArkonisDeployment that executes this step.
 	// +kubebuilder:validation:Required
-	AgentDeployment string `json:"agentDeployment"`
+	ArkonisDeployment string `json:"agentDeployment"`
 
 	// Inputs is a map of input key → Go template expression referencing pipeline
 	// inputs or earlier step outputs. Example: "{{ .steps.research.output }}"
@@ -67,8 +67,8 @@ type PipelineStep struct {
 	OutputSchema string `json:"outputSchema,omitempty"`
 }
 
-// AgentPipelineSpec defines the desired state of AgentPipeline.
-type AgentPipelineSpec struct {
+// ArkonisPipelineSpec defines the desired state of ArkonisPipeline.
+type ArkonisPipelineSpec struct {
 	// Steps is the ordered (DAG) list of pipeline nodes.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
@@ -107,8 +107,8 @@ type PipelineStepStatus struct {
 	Message string `json:"message,omitempty"`
 }
 
-// AgentPipelineStatus defines the observed state of AgentPipeline.
-type AgentPipelineStatus struct {
+// ArkonisPipelineStatus defines the observed state of ArkonisPipeline.
+type ArkonisPipelineStatus struct {
 	// Phase is the overall pipeline execution state.
 	Phase PipelinePhase `json:"phase,omitempty"`
 	// Steps holds per-step status.
@@ -121,7 +121,7 @@ type AgentPipelineStatus struct {
 	Output string `json:"output,omitempty"`
 	// ObservedGeneration is the .metadata.generation this status reflects.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Conditions reflect the current state of the AgentPipeline.
+	// Conditions reflect the current state of the ArkonisPipeline.
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -132,31 +132,31 @@ type AgentPipelineStatus struct {
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Steps",type=integer,JSONPath=`.spec.steps`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-// +kubebuilder:resource:shortName=agpipe,scope=Namespaced
+// +kubebuilder:resource:shortName=aopipe,scope=Namespaced
 
-// AgentPipeline defines a DAG of agent steps where outputs feed into inputs.
-type AgentPipeline struct {
+// ArkonisPipeline defines a DAG of agent steps where outputs feed into inputs.
+type ArkonisPipeline struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +required
-	Spec AgentPipelineSpec `json:"spec"`
+	Spec ArkonisPipelineSpec `json:"spec"`
 
 	// +optional
-	Status AgentPipelineStatus `json:"status,omitempty"`
+	Status ArkonisPipelineStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AgentPipelineList contains a list of AgentPipeline.
-type AgentPipelineList struct {
+// ArkonisPipelineList contains a list of ArkonisPipeline.
+type ArkonisPipelineList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AgentPipeline `json:"items"`
+	Items           []ArkonisPipeline `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AgentPipeline{}, &AgentPipelineList{})
+	SchemeBuilder.Register(&ArkonisPipeline{}, &ArkonisPipelineList{})
 }

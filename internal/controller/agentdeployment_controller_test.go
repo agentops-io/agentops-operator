@@ -29,12 +29,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
-const testAgentImage = "ghcr.io/agentops-io/agentops-runtime:latest"
+const testAgentImage = "ghcr.io/arkonis-dev/arkonis-runtime:latest"
 
-var _ = Describe("AgentDeployment Controller", func() {
+var _ = Describe("ArkonisDeployment Controller", func() {
 	const (
 		resourceName = "test-agent"
 		namespace    = "default"
@@ -46,7 +46,7 @@ var _ = Describe("AgentDeployment Controller", func() {
 	backingDeploymentName := types.NamespacedName{Name: resourceName + "-agent", Namespace: namespace}
 
 	AfterEach(func() {
-		ad := &agentopsv1alpha1.AgentDeployment{}
+		ad := &arkonisv1alpha1.ArkonisDeployment{}
 		if err := k8sClient.Get(ctx, namespacedName, ad); err == nil {
 			Expect(k8sClient.Delete(ctx, ad)).To(Succeed())
 		}
@@ -56,22 +56,22 @@ var _ = Describe("AgentDeployment Controller", func() {
 		}
 	})
 
-	Context("When reconciling a valid AgentDeployment", func() {
+	Context("When reconciling a valid ArkonisDeployment", func() {
 		BeforeEach(func() {
-			By("creating an AgentDeployment with required fields")
+			By("creating an ArkonisDeployment with required fields")
 			replicas := int32(2)
-			resource := &agentopsv1alpha1.AgentDeployment{
+			resource := &arkonisv1alpha1.ArkonisDeployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: agentopsv1alpha1.AgentDeploymentSpec{
+				Spec: arkonisv1alpha1.ArkonisDeploymentSpec{
 					Replicas:     &replicas,
 					Model:        "claude-haiku-4-5",
 					SystemPrompt: "You are a helpful assistant.",
 				},
 			}
-			err := k8sClient.Get(ctx, namespacedName, &agentopsv1alpha1.AgentDeployment{})
+			err := k8sClient.Get(ctx, namespacedName, &arkonisv1alpha1.ArkonisDeployment{})
 			if errors.IsNotFound(err) {
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -79,7 +79,7 @@ var _ = Describe("AgentDeployment Controller", func() {
 
 		It("should create a backing Deployment", func() {
 			By("running the reconciler")
-			reconciler := &AgentDeploymentReconciler{
+			reconciler := &ArkonisDeploymentReconciler{
 				Client:     k8sClient,
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,
@@ -96,8 +96,8 @@ var _ = Describe("AgentDeployment Controller", func() {
 			Expect(*dep.Spec.Replicas).To(Equal(int32(2)))
 
 			By("verifying the Deployment has the agent selector label")
-			Expect(dep.Spec.Selector.MatchLabels).To(HaveKey("agentops.io/deployment"))
-			Expect(dep.Spec.Selector.MatchLabels["agentops.io/deployment"]).To(Equal(resourceName))
+			Expect(dep.Spec.Selector.MatchLabels).To(HaveKey("arkonis.dev/deployment"))
+			Expect(dep.Spec.Selector.MatchLabels["arkonis.dev/deployment"]).To(Equal(resourceName))
 
 			By("verifying the container uses the agent runtime image")
 			Expect(dep.Spec.Template.Spec.Containers).To(HaveLen(1))
@@ -117,7 +117,7 @@ var _ = Describe("AgentDeployment Controller", func() {
 
 		It("should set status conditions after reconciliation", func() {
 			By("running the reconciler twice (create + sync status)")
-			reconciler := &AgentDeploymentReconciler{
+			reconciler := &ArkonisDeploymentReconciler{
 				Client:     k8sClient,
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,
@@ -129,8 +129,8 @@ var _ = Describe("AgentDeployment Controller", func() {
 			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("fetching the updated AgentDeployment status")
-			ad := &agentopsv1alpha1.AgentDeployment{}
+			By("fetching the updated ArkonisDeployment status")
+			ad := &arkonisv1alpha1.ArkonisDeployment{}
 			Expect(k8sClient.Get(ctx, namespacedName, ad)).To(Succeed())
 
 			By("verifying the Ready condition is present")
@@ -140,7 +140,7 @@ var _ = Describe("AgentDeployment Controller", func() {
 
 		It("should set an owner reference on the backing Deployment", func() {
 			By("running the reconciler")
-			reconciler := &AgentDeploymentReconciler{
+			reconciler := &ArkonisDeploymentReconciler{
 				Client:     k8sClient,
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,
@@ -148,18 +148,18 @@ var _ = Describe("AgentDeployment Controller", func() {
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("verifying the Deployment has an owner reference pointing to the AgentDeployment")
+			By("verifying the Deployment has an owner reference pointing to the ArkonisDeployment")
 			dep := &appsv1.Deployment{}
 			Expect(k8sClient.Get(ctx, backingDeploymentName, dep)).To(Succeed())
 			Expect(dep.OwnerReferences).To(HaveLen(1))
-			Expect(dep.OwnerReferences[0].Kind).To(Equal("AgentDeployment"))
+			Expect(dep.OwnerReferences[0].Kind).To(Equal("ArkonisDeployment"))
 			Expect(dep.OwnerReferences[0].Name).To(Equal(resourceName))
 		})
 	})
 
-	Context("When the AgentDeployment is deleted", func() {
+	Context("When the ArkonisDeployment is deleted", func() {
 		It("should reconcile without error for a missing resource", func() {
-			reconciler := &AgentDeploymentReconciler{
+			reconciler := &ArkonisDeploymentReconciler{
 				Client:     k8sClient,
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,
@@ -171,7 +171,7 @@ var _ = Describe("AgentDeployment Controller", func() {
 		})
 	})
 
-	Context("When an AgentDeployment references an AgentMemory", func() {
+	Context("When an ArkonisDeployment references an ArkonisMemory", func() {
 		const (
 			agentName = "mem-agent"
 			memName   = "test-mem"
@@ -181,37 +181,37 @@ var _ = Describe("AgentDeployment Controller", func() {
 		backingKey := types.NamespacedName{Name: agentName + "-agent", Namespace: namespace}
 
 		BeforeEach(func() {
-			By("creating an AgentMemory with redis backend")
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			By("creating an ArkonisMemory with redis backend")
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: memName, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendRedis,
-					Redis: &agentopsv1alpha1.RedisMemoryConfig{
-						SecretRef:  agentopsv1alpha1.LocalObjectReference{Name: "redis-secret"},
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendRedis,
+					Redis: &arkonisv1alpha1.RedisMemoryConfig{
+						SecretRef:  arkonisv1alpha1.LocalObjectReference{Name: "redis-secret"},
 						TTLSeconds: 1800,
 					},
 				},
 			})).To(Succeed())
 
-			By("creating an AgentDeployment that references the AgentMemory")
+			By("creating an ArkonisDeployment that references the ArkonisMemory")
 			replicas := int32(1)
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentDeployment{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisDeployment{
 				ObjectMeta: metav1.ObjectMeta{Name: agentName, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentDeploymentSpec{
+				Spec: arkonisv1alpha1.ArkonisDeploymentSpec{
 					Replicas:     &replicas,
 					Model:        "claude-haiku-4-5",
 					SystemPrompt: "You are a helpful assistant.",
-					MemoryRef:    &agentopsv1alpha1.LocalObjectReference{Name: memName},
+					MemoryRef:    &arkonisv1alpha1.LocalObjectReference{Name: memName},
 				},
 			})).To(Succeed())
 		})
 
 		AfterEach(func() {
-			ad := &agentopsv1alpha1.AgentDeployment{}
+			ad := &arkonisv1alpha1.ArkonisDeployment{}
 			if err := k8sClient.Get(ctx, agentKey, ad); err == nil {
 				Expect(k8sClient.Delete(ctx, ad)).To(Succeed())
 			}
-			mem := &agentopsv1alpha1.AgentMemory{}
+			mem := &arkonisv1alpha1.ArkonisMemory{}
 			if err := k8sClient.Get(ctx, memKey, mem); err == nil {
 				Expect(k8sClient.Delete(ctx, mem)).To(Succeed())
 			}
@@ -222,7 +222,7 @@ var _ = Describe("AgentDeployment Controller", func() {
 		})
 
 		It("should inject AGENT_MEMORY_BACKEND env var into the backing Deployment", func() {
-			reconciler := &AgentDeploymentReconciler{
+			reconciler := &ArkonisDeploymentReconciler{
 				Client:     k8sClient,
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,
@@ -239,17 +239,17 @@ var _ = Describe("AgentDeployment Controller", func() {
 				envMap[e.Name] = e.Value
 			}
 
-			Expect(envMap).To(HaveKeyWithValue("AGENT_MEMORY_BACKEND", string(agentopsv1alpha1.MemoryBackendRedis)))
+			Expect(envMap).To(HaveKeyWithValue("AGENT_MEMORY_BACKEND", string(arkonisv1alpha1.MemoryBackendRedis)))
 			Expect(envMap).To(HaveKeyWithValue("AGENT_MEMORY_REDIS_TTL", "1800"))
 		})
 
-		It("should reconcile without error when the referenced AgentMemory does not exist", func() {
-			By("deleting the AgentMemory before reconciling")
-			mem := &agentopsv1alpha1.AgentMemory{}
+		It("should reconcile without error when the referenced ArkonisMemory does not exist", func() {
+			By("deleting the ArkonisMemory before reconciling")
+			mem := &arkonisv1alpha1.ArkonisMemory{}
 			Expect(k8sClient.Get(ctx, memKey, mem)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, mem)).To(Succeed())
 
-			reconciler := &AgentDeploymentReconciler{
+			reconciler := &ArkonisDeploymentReconciler{
 				Client:     k8sClient,
 				Scheme:     k8sClient.Scheme(),
 				AgentImage: testAgentImage,

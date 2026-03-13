@@ -1,4 +1,4 @@
-module github.com/agentops-io/agentops-operator
+module github.com/arkonis-dev/arkonis-operator
 
 go 1.25.3
 

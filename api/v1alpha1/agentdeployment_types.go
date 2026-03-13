@@ -28,8 +28,8 @@ type MCPServerSpec struct {
 	URL string `json:"url"`
 }
 
-// AgentLimits constrains per-agent resource usage.
-type AgentLimits struct {
+// ArkonisLimits constrains per-agent resource usage.
+type ArkonisLimits struct {
 	// MaxTokensPerCall is the maximum number of tokens per Anthropic API call.
 	// +kubebuilder:default=8000
 	MaxTokensPerCall int `json:"maxTokensPerCall,omitempty"`
@@ -50,8 +50,8 @@ const (
 	ProbeTypePing     ProbeType = "ping"
 )
 
-// AgentProbe defines how to evaluate agent health.
-type AgentProbe struct {
+// ArkonisProbe defines how to evaluate agent health.
+type ArkonisProbe struct {
 	// Type is the probe strategy: "semantic" (LLM-based) or "ping" (HTTP).
 	Type ProbeType `json:"type"`
 	// IntervalSeconds is how often the probe runs.
@@ -61,8 +61,8 @@ type AgentProbe struct {
 	ValidatorPrompt string `json:"validatorPrompt,omitempty"`
 }
 
-// AgentDeploymentSpec defines the desired state of AgentDeployment.
-type AgentDeploymentSpec struct {
+// ArkonisDeploymentSpec defines the desired state of ArkonisDeployment.
+type ArkonisDeploymentSpec struct {
 	// Replicas is the number of agent instances to run.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
@@ -82,15 +82,15 @@ type AgentDeploymentSpec struct {
 	MCPServers []MCPServerSpec `json:"mcpServers,omitempty"`
 
 	// Limits constrains agent resource usage.
-	Limits *AgentLimits `json:"limits,omitempty"`
+	Limits *ArkonisLimits `json:"limits,omitempty"`
 
 	// LivenessProbe defines how agent health is evaluated.
-	LivenessProbe *AgentProbe `json:"livenessProbe,omitempty"`
+	LivenessProbe *ArkonisProbe `json:"livenessProbe,omitempty"`
 
-	// ConfigRef optionally references an AgentConfig for shared settings.
+	// ConfigRef optionally references an ArkonisConfig for shared settings.
 	ConfigRef *LocalObjectReference `json:"configRef,omitempty"`
 
-	// MemoryRef optionally references an AgentMemory that defines the persistent
+	// MemoryRef optionally references an ArkonisMemory that defines the persistent
 	// memory backend for agent instances. When set, the operator injects memory
 	// connection details as environment variables into agent pods.
 	MemoryRef *LocalObjectReference `json:"memoryRef,omitempty"`
@@ -102,15 +102,15 @@ type LocalObjectReference struct {
 	Name string `json:"name"`
 }
 
-// AgentDeploymentStatus defines the observed state of AgentDeployment.
-type AgentDeploymentStatus struct {
+// ArkonisDeploymentStatus defines the observed state of ArkonisDeployment.
+type ArkonisDeploymentStatus struct {
 	// ReadyReplicas is the number of agent pods ready to accept tasks.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 	// Replicas is the total number of agent pods (ready or not).
 	Replicas int32 `json:"replicas,omitempty"`
 	// ObservedGeneration is the .metadata.generation this status reflects.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Conditions reflect the current state of the AgentDeployment.
+	// Conditions reflect the current state of the ArkonisDeployment.
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -123,31 +123,31 @@ type AgentDeploymentStatus struct {
 // +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=`.spec.replicas`
 // +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-// +kubebuilder:resource:shortName=agdep,scope=Namespaced
+// +kubebuilder:resource:shortName=aodep,scope=Namespaced
 
-// AgentDeployment manages a pool of LLM agent instances.
-type AgentDeployment struct {
+// ArkonisDeployment manages a pool of LLM agent instances.
+type ArkonisDeployment struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +required
-	Spec AgentDeploymentSpec `json:"spec"`
+	Spec ArkonisDeploymentSpec `json:"spec"`
 
 	// +optional
-	Status AgentDeploymentStatus `json:"status,omitempty"`
+	Status ArkonisDeploymentStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AgentDeploymentList contains a list of AgentDeployment.
-type AgentDeploymentList struct {
+// ArkonisDeploymentList contains a list of ArkonisDeployment.
+type ArkonisDeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AgentDeployment `json:"items"`
+	Items           []ArkonisDeployment `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AgentDeployment{}, &AgentDeploymentList{})
+	SchemeBuilder.Register(&ArkonisDeployment{}, &ArkonisDeploymentList{})
 }

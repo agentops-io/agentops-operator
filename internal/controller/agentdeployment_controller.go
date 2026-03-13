@@ -31,36 +31,36 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
 const (
 	// agentAPIKeysSecret is the k8s Secret expected to contain ANTHROPIC_API_KEY
 	// and TASK_QUEUE_URL, injected via EnvFrom into every agent pod.
-	agentAPIKeysSecret = "agentops-operator-api-keys"
+	agentAPIKeysSecret = "arkonis-api-keys"
 )
 
-// AgentDeploymentReconciler reconciles a AgentDeployment object
-type AgentDeploymentReconciler struct {
+// ArkonisDeploymentReconciler reconciles a ArkonisDeployment object
+type ArkonisDeploymentReconciler struct {
 	client.Client
 	Scheme     *runtime.Scheme
 	AgentImage string
 }
 
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentdeployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentdeployments/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentdeployments/finalizers,verbs=update
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentmemories,verbs=get;list;watch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentdeployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentdeployments/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentdeployments/finalizers,verbs=update
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentmemories,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
-func (r *AgentDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ArkonisDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// 1. Fetch the AgentDeployment CR.
-	agentDep := &agentopsv1alpha1.AgentDeployment{}
+	// 1. Fetch the ArkonisDeployment CR.
+	agentDep := &arkonisv1alpha1.ArkonisDeployment{}
 	if err := r.Get(ctx, req.NamespacedName, agentDep); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -73,35 +73,35 @@ func (r *AgentDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	// 3. Optionally load the referenced AgentConfig.
-	var agentCfg *agentopsv1alpha1.AgentConfig
+	// 3. Optionally load the referenced ArkonisConfig.
+	var agentCfg *arkonisv1alpha1.ArkonisConfig
 	if agentDep.Spec.ConfigRef != nil {
-		cfg := &agentopsv1alpha1.AgentConfig{}
+		cfg := &arkonisv1alpha1.ArkonisConfig{}
 		if err := r.Get(ctx, client.ObjectKey{
 			Name:      agentDep.Spec.ConfigRef.Name,
 			Namespace: agentDep.Namespace,
 		}, cfg); err != nil {
 			if !errors.IsNotFound(err) {
-				return ctrl.Result{}, fmt.Errorf("fetching AgentConfig %q: %w", agentDep.Spec.ConfigRef.Name, err)
+				return ctrl.Result{}, fmt.Errorf("fetching ArkonisConfig %q: %w", agentDep.Spec.ConfigRef.Name, err)
 			}
-			logger.Info("AgentConfig not found, proceeding without it", "configRef", agentDep.Spec.ConfigRef.Name)
+			logger.Info("ArkonisConfig not found, proceeding without it", "configRef", agentDep.Spec.ConfigRef.Name)
 		} else {
 			agentCfg = cfg
 		}
 	}
 
-	// 3b. Optionally load the referenced AgentMemory.
-	var agentMem *agentopsv1alpha1.AgentMemory
+	// 3b. Optionally load the referenced ArkonisMemory.
+	var agentMem *arkonisv1alpha1.ArkonisMemory
 	if agentDep.Spec.MemoryRef != nil {
-		mem := &agentopsv1alpha1.AgentMemory{}
+		mem := &arkonisv1alpha1.ArkonisMemory{}
 		if err := r.Get(ctx, client.ObjectKey{
 			Name:      agentDep.Spec.MemoryRef.Name,
 			Namespace: agentDep.Namespace,
 		}, mem); err != nil {
 			if !errors.IsNotFound(err) {
-				return ctrl.Result{}, fmt.Errorf("fetching AgentMemory %q: %w", agentDep.Spec.MemoryRef.Name, err)
+				return ctrl.Result{}, fmt.Errorf("fetching ArkonisMemory %q: %w", agentDep.Spec.MemoryRef.Name, err)
 			}
-			logger.Info("AgentMemory not found, proceeding without it", "memoryRef", agentDep.Spec.MemoryRef.Name)
+			logger.Info("ArkonisMemory not found, proceeding without it", "memoryRef", agentDep.Spec.MemoryRef.Name)
 		} else {
 			agentMem = mem
 		}
@@ -123,11 +123,11 @@ func (r *AgentDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-func (r *AgentDeploymentReconciler) reconcileDeployment(
+func (r *ArkonisDeploymentReconciler) reconcileDeployment(
 	ctx context.Context,
-	agentDep *agentopsv1alpha1.AgentDeployment,
-	agentCfg *agentopsv1alpha1.AgentConfig,
-	agentMem *agentopsv1alpha1.AgentMemory,
+	agentDep *arkonisv1alpha1.ArkonisDeployment,
+	agentCfg *arkonisv1alpha1.ArkonisConfig,
+	agentMem *arkonisv1alpha1.ArkonisMemory,
 ) error {
 	desired := r.buildDeployment(agentDep, agentCfg, agentMem)
 
@@ -150,9 +150,9 @@ func (r *AgentDeploymentReconciler) reconcileDeployment(
 	return r.Patch(ctx, existing, patch)
 }
 
-func (r *AgentDeploymentReconciler) syncStatus(
+func (r *ArkonisDeploymentReconciler) syncStatus(
 	ctx context.Context,
-	agentDep *agentopsv1alpha1.AgentDeployment,
+	agentDep *arkonisv1alpha1.ArkonisDeployment,
 ) error {
 	dep := &appsv1.Deployment{}
 	if err := r.Get(ctx, client.ObjectKey{
@@ -181,12 +181,12 @@ func (r *AgentDeploymentReconciler) syncStatus(
 	return r.Status().Update(ctx, agentDep)
 }
 
-func (r *AgentDeploymentReconciler) buildDeployment(agentDep *agentopsv1alpha1.AgentDeployment, agentCfg *agentopsv1alpha1.AgentConfig, agentMem *agentopsv1alpha1.AgentMemory) *appsv1.Deployment {
+func (r *ArkonisDeploymentReconciler) buildDeployment(agentDep *arkonisv1alpha1.ArkonisDeployment, agentCfg *arkonisv1alpha1.ArkonisConfig, agentMem *arkonisv1alpha1.ArkonisMemory) *appsv1.Deployment {
 	labels := map[string]string{
 		"app.kubernetes.io/name":       "agent",
 		"app.kubernetes.io/instance":   agentDep.Name,
-		"app.kubernetes.io/managed-by": "agentops-operator",
-		"agentops.io/deployment":       agentDep.Name,
+		"app.kubernetes.io/managed-by": "arkonis-operator",
+		"arkonis.dev/deployment":       agentDep.Name,
 	}
 
 	replicas := int32(1)
@@ -251,10 +251,10 @@ func (r *AgentDeploymentReconciler) buildDeployment(agentDep *agentopsv1alpha1.A
 	}
 }
 
-func (r *AgentDeploymentReconciler) buildEnvVars(
-	agentDep *agentopsv1alpha1.AgentDeployment,
-	agentCfg *agentopsv1alpha1.AgentConfig,
-	agentMem *agentopsv1alpha1.AgentMemory,
+func (r *ArkonisDeploymentReconciler) buildEnvVars(
+	agentDep *arkonisv1alpha1.ArkonisDeployment,
+	agentCfg *arkonisv1alpha1.ArkonisConfig,
+	agentMem *arkonisv1alpha1.ArkonisMemory,
 ) []corev1.EnvVar {
 	mcpJSON, _ := json.Marshal(agentDep.Spec.MCPServers)
 
@@ -269,7 +269,7 @@ func (r *AgentDeploymentReconciler) buildEnvVars(
 		}
 	}
 
-	// Merge AgentConfig prompt fragments into the effective system prompt.
+	// Merge ArkonisConfig prompt fragments into the effective system prompt.
 	systemPrompt := agentDep.Spec.SystemPrompt
 	if agentCfg != nil {
 		if agentCfg.Spec.PromptFragments.Persona != "" {
@@ -297,7 +297,7 @@ func (r *AgentDeploymentReconciler) buildEnvVars(
 
 	// Propagate the custom validator prompt when a semantic liveness probe is configured.
 	if agentDep.Spec.LivenessProbe != nil &&
-		agentDep.Spec.LivenessProbe.Type == agentopsv1alpha1.ProbeTypeSemantic &&
+		agentDep.Spec.LivenessProbe.Type == arkonisv1alpha1.ProbeTypeSemantic &&
 		agentDep.Spec.LivenessProbe.ValidatorPrompt != "" {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "AGENT_VALIDATOR_PROMPT",
@@ -305,7 +305,7 @@ func (r *AgentDeploymentReconciler) buildEnvVars(
 		})
 	}
 
-	// Propagate optional AgentConfig settings as env vars for the runtime.
+	// Propagate optional ArkonisConfig settings as env vars for the runtime.
 	if agentCfg != nil {
 		if agentCfg.Spec.Temperature != "" {
 			envVars = append(envVars, corev1.EnvVar{Name: "AGENT_TEMPERATURE", Value: agentCfg.Spec.Temperature})
@@ -318,15 +318,15 @@ func (r *AgentDeploymentReconciler) buildEnvVars(
 		}
 	}
 
-	// Propagate AgentMemory config as env vars. AgentMemory takes precedence over
-	// any AGENT_MEMORY_BACKEND set via AgentConfig.
+	// Propagate ArkonisMemory config as env vars. ArkonisMemory takes precedence over
+	// any AGENT_MEMORY_BACKEND set via ArkonisConfig.
 	if agentMem != nil {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "AGENT_MEMORY_BACKEND",
 			Value: string(agentMem.Spec.Backend),
 		})
 		switch agentMem.Spec.Backend {
-		case agentopsv1alpha1.MemoryBackendRedis:
+		case arkonisv1alpha1.MemoryBackendRedis:
 			if agentMem.Spec.Redis != nil {
 				// Inject Redis URL from the referenced Secret.
 				envVars = append(envVars, corev1.EnvVar{
@@ -351,7 +351,7 @@ func (r *AgentDeploymentReconciler) buildEnvVars(
 					})
 				}
 			}
-		case agentopsv1alpha1.MemoryBackendVectorStore:
+		case arkonisv1alpha1.MemoryBackendVectorStore:
 			if agentMem.Spec.VectorStore != nil {
 				envVars = append(envVars,
 					corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_PROVIDER", Value: string(agentMem.Spec.VectorStore.Provider)},
@@ -382,8 +382,8 @@ func (r *AgentDeploymentReconciler) buildEnvVars(
 	return envVars
 }
 
-func (r *AgentDeploymentReconciler) setCondition(
-	agentDep *agentopsv1alpha1.AgentDeployment,
+func (r *ArkonisDeploymentReconciler) setCondition(
+	agentDep *arkonisv1alpha1.ArkonisDeployment,
 	condType string,
 	status metav1.ConditionStatus,
 	reason, message string,
@@ -398,9 +398,9 @@ func (r *AgentDeploymentReconciler) setCondition(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AgentDeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ArkonisDeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&agentopsv1alpha1.AgentDeployment{}).
+		For(&arkonisv1alpha1.ArkonisDeployment{}).
 		Owns(&appsv1.Deployment{}).
 		Named("agentdeployment").
 		Complete(r)

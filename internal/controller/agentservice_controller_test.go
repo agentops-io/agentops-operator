@@ -28,10 +28,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
-var _ = Describe("AgentService Controller", func() {
+var _ = Describe("ArkonisService Controller", func() {
 	const (
 		resourceName = "test-service"
 		namespace    = "default"
@@ -41,26 +41,26 @@ var _ = Describe("AgentService Controller", func() {
 	namespacedName := types.NamespacedName{Name: resourceName, Namespace: namespace}
 
 	AfterEach(func() {
-		svc := &agentopsv1alpha1.AgentService{}
+		svc := &arkonisv1alpha1.ArkonisService{}
 		if err := k8sClient.Get(ctx, namespacedName, svc); err == nil {
 			Expect(k8sClient.Delete(ctx, svc)).To(Succeed())
 		}
 	})
 
-	Context("When reconciling a valid AgentService", func() {
+	Context("When reconciling a valid ArkonisService", func() {
 		BeforeEach(func() {
-			By("creating an AgentService with a selector")
-			resource := &agentopsv1alpha1.AgentService{
+			By("creating an ArkonisService with a selector")
+			resource := &arkonisv1alpha1.ArkonisService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: agentopsv1alpha1.AgentServiceSpec{
-					Selector: agentopsv1alpha1.AgentServiceSelector{
-						AgentDeployment: "research-agent",
+				Spec: arkonisv1alpha1.ArkonisServiceSpec{
+					Selector: arkonisv1alpha1.ArkonisServiceSelector{
+						ArkonisDeployment: "research-agent",
 					},
-					Routing: agentopsv1alpha1.AgentServiceRouting{
-						Strategy: agentopsv1alpha1.RoutingStrategyLeastBusy,
+					Routing: arkonisv1alpha1.ArkonisServiceRouting{
+						Strategy: arkonisv1alpha1.RoutingStrategyLeastBusy,
 					},
 				},
 			}
@@ -69,7 +69,7 @@ var _ = Describe("AgentService Controller", func() {
 
 		It("should reconcile without error", func() {
 			By("running the reconciler")
-			reconciler := &AgentServiceReconciler{
+			reconciler := &ArkonisServiceReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
@@ -77,17 +77,17 @@ var _ = Describe("AgentService Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should set DeploymentNotFound condition when AgentDeployment is missing", func() {
+		It("should set DeploymentNotFound condition when ArkonisDeployment is missing", func() {
 			By("running the reconciler")
-			reconciler := &AgentServiceReconciler{
+			reconciler := &ArkonisServiceReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("fetching the updated AgentService status")
-			svc := &agentopsv1alpha1.AgentService{}
+			By("fetching the updated ArkonisService status")
+			svc := &arkonisv1alpha1.ArkonisService{}
 			Expect(k8sClient.Get(ctx, namespacedName, svc)).To(Succeed())
 
 			By("verifying the Ready condition is False with DeploymentNotFound reason")
@@ -98,16 +98,16 @@ var _ = Describe("AgentService Controller", func() {
 		})
 	})
 
-	Context("When the referenced AgentDeployment exists", func() {
+	Context("When the referenced ArkonisDeployment exists", func() {
 		const depName = "backing-agent"
 		depKey := types.NamespacedName{Name: depName, Namespace: namespace}
 
 		BeforeEach(func() {
-			By("creating the backing AgentDeployment")
+			By("creating the backing ArkonisDeployment")
 			replicas := int32(2)
-			dep := &agentopsv1alpha1.AgentDeployment{
+			dep := &arkonisv1alpha1.ArkonisDeployment{
 				ObjectMeta: metav1.ObjectMeta{Name: depName, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentDeploymentSpec{
+				Spec: arkonisv1alpha1.ArkonisDeploymentSpec{
 					Replicas:     &replicas,
 					Model:        "claude-haiku-4-5",
 					SystemPrompt: "You are helpful.",
@@ -115,13 +115,13 @@ var _ = Describe("AgentService Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, dep)).To(Succeed())
 
-			By("creating the AgentService referencing it")
-			svc := &agentopsv1alpha1.AgentService{
+			By("creating the ArkonisService referencing it")
+			svc := &arkonisv1alpha1.ArkonisService{
 				ObjectMeta: metav1.ObjectMeta{Name: resourceName, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentServiceSpec{
-					Selector: agentopsv1alpha1.AgentServiceSelector{AgentDeployment: depName},
-					Ports: []agentopsv1alpha1.AgentServicePort{
-						{Protocol: agentopsv1alpha1.AgentProtocolHTTP, Port: 8081},
+				Spec: arkonisv1alpha1.ArkonisServiceSpec{
+					Selector: arkonisv1alpha1.ArkonisServiceSelector{ArkonisDeployment: depName},
+					Ports: []arkonisv1alpha1.ArkonisServicePort{
+						{Protocol: arkonisv1alpha1.AgentProtocolHTTP, Port: 8081},
 					},
 				},
 			}
@@ -129,7 +129,7 @@ var _ = Describe("AgentService Controller", func() {
 		})
 
 		AfterEach(func() {
-			dep := &agentopsv1alpha1.AgentDeployment{}
+			dep := &arkonisv1alpha1.ArkonisDeployment{}
 			if err := k8sClient.Get(ctx, depKey, dep); err == nil {
 				Expect(k8sClient.Delete(ctx, dep)).To(Succeed())
 			}
@@ -140,7 +140,7 @@ var _ = Describe("AgentService Controller", func() {
 		})
 
 		It("should create a backing k8s Service with the correct selector and owner ref", func() {
-			reconciler := &AgentServiceReconciler{
+			reconciler := &ArkonisServiceReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
@@ -151,49 +151,49 @@ var _ = Describe("AgentService Controller", func() {
 			k8sSvc := &corev1.Service{}
 			Expect(k8sClient.Get(ctx, namespacedName, k8sSvc)).To(Succeed())
 
-			By("verifying the selector targets the AgentDeployment's pods")
-			Expect(k8sSvc.Spec.Selector).To(HaveKeyWithValue("agentops.io/deployment", depName))
+			By("verifying the selector targets the ArkonisDeployment's pods")
+			Expect(k8sSvc.Spec.Selector).To(HaveKeyWithValue("arkonis.dev/deployment", depName))
 
 			By("verifying the port is set")
 			Expect(k8sSvc.Spec.Ports).To(HaveLen(1))
 			Expect(k8sSvc.Spec.Ports[0].Port).To(Equal(int32(8081)))
 
-			By("verifying an owner reference points to the AgentService")
+			By("verifying an owner reference points to the ArkonisService")
 			Expect(k8sSvc.OwnerReferences).To(HaveLen(1))
-			Expect(k8sSvc.OwnerReferences[0].Kind).To(Equal("AgentService"))
+			Expect(k8sSvc.OwnerReferences[0].Kind).To(Equal("ArkonisService"))
 			Expect(k8sSvc.OwnerReferences[0].Name).To(Equal(resourceName))
 
 			By("verifying the Ready condition is True")
-			agsvc := &agentopsv1alpha1.AgentService{}
-			Expect(k8sClient.Get(ctx, namespacedName, agsvc)).To(Succeed())
-			cond := apimeta.FindStatusCondition(agsvc.Status.Conditions, "Ready")
+			arksvc := &arkonisv1alpha1.ArkonisService{}
+			Expect(k8sClient.Get(ctx, namespacedName, arksvc)).To(Succeed())
+			cond := apimeta.FindStatusCondition(arksvc.Status.Conditions, "Ready")
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 		})
 	})
 
-	Context("When reconciling an AgentService with no selector", func() {
+	Context("When reconciling an ArkonisService with no selector", func() {
 		BeforeEach(func() {
-			By("creating an AgentService with empty selector")
-			resource := &agentopsv1alpha1.AgentService{
+			By("creating an ArkonisService with empty selector")
+			resource := &arkonisv1alpha1.ArkonisService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: agentopsv1alpha1.AgentServiceSpec{},
+				Spec: arkonisv1alpha1.ArkonisServiceSpec{},
 			}
 			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 		})
 
 		It("should reconcile without error and set NoSelector condition", func() {
-			reconciler := &AgentServiceReconciler{
+			reconciler := &ArkonisServiceReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
-			svc := &agentopsv1alpha1.AgentService{}
+			svc := &arkonisv1alpha1.ArkonisService{}
 			Expect(k8sClient.Get(ctx, namespacedName, svc)).To(Succeed())
 
 			cond := apimeta.FindStatusCondition(svc.Status.Conditions, "Ready")

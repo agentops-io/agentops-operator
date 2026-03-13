@@ -30,7 +30,7 @@ const (
 	RoutingStrategyRandom     RoutingStrategy = "random"
 )
 
-// AgentProtocol defines the protocol for an AgentService port.
+// AgentProtocol defines the protocol for an ArkonisService port.
 // +kubebuilder:validation:Enum=A2A;HTTP
 type AgentProtocol string
 
@@ -39,8 +39,8 @@ const (
 	AgentProtocolHTTP AgentProtocol = "HTTP"
 )
 
-// AgentServicePort defines a port exposed by the AgentService.
-type AgentServicePort struct {
+// ArkonisServicePort defines a port exposed by the ArkonisService.
+type ArkonisServicePort struct {
 	// Protocol is the communication protocol: "A2A" (agent-to-agent) or "HTTP" (external).
 	Protocol AgentProtocol `json:"protocol"`
 	// Port is the network port number.
@@ -49,40 +49,40 @@ type AgentServicePort struct {
 	Port int32 `json:"port"`
 }
 
-// AgentServiceRouting defines the task routing configuration.
-type AgentServiceRouting struct {
+// ArkonisServiceRouting defines the task routing configuration.
+type ArkonisServiceRouting struct {
 	// Strategy controls how tasks are distributed across agent replicas.
 	// +kubebuilder:default=round-robin
 	Strategy RoutingStrategy `json:"strategy,omitempty"`
 }
 
-// AgentServiceSpec defines the desired state of AgentService.
-type AgentServiceSpec struct {
-	// Selector identifies the AgentDeployment this service routes tasks to.
+// ArkonisServiceSpec defines the desired state of ArkonisService.
+type ArkonisServiceSpec struct {
+	// Selector identifies the ArkonisDeployment this service routes tasks to.
 	// +kubebuilder:validation:Required
-	Selector AgentServiceSelector `json:"selector"`
+	Selector ArkonisServiceSelector `json:"selector"`
 
 	// Routing configures how incoming tasks are distributed.
-	Routing AgentServiceRouting `json:"routing,omitempty"`
+	Routing ArkonisServiceRouting `json:"routing,omitempty"`
 
 	// Ports lists the network ports exposed by this service.
-	Ports []AgentServicePort `json:"ports,omitempty"`
+	Ports []ArkonisServicePort `json:"ports,omitempty"`
 }
 
-// AgentServiceSelector identifies the target AgentDeployment.
-type AgentServiceSelector struct {
-	// AgentDeployment is the name of the AgentDeployment to route tasks to.
+// ArkonisServiceSelector identifies the target ArkonisDeployment.
+type ArkonisServiceSelector struct {
+	// ArkonisDeployment is the name of the ArkonisDeployment to route tasks to.
 	// +kubebuilder:validation:Required
-	AgentDeployment string `json:"agentDeployment"`
+	ArkonisDeployment string `json:"agentDeployment"`
 }
 
-// AgentServiceStatus defines the observed state of AgentService.
-type AgentServiceStatus struct {
+// ArkonisServiceStatus defines the observed state of ArkonisService.
+type ArkonisServiceStatus struct {
 	// ReadyReplicas is the number of ready agent replicas currently backing this service.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 	// ObservedGeneration is the .metadata.generation this status reflects.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Conditions reflect the current state of the AgentService.
+	// Conditions reflect the current state of the ArkonisService.
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -94,31 +94,31 @@ type AgentServiceStatus struct {
 // +kubebuilder:printcolumn:name="Strategy",type=string,JSONPath=`.spec.routing.strategy`
 // +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-// +kubebuilder:resource:shortName=agsvc,scope=Namespaced
+// +kubebuilder:resource:shortName=aosvc,scope=Namespaced
 
-// AgentService routes incoming tasks to a pool of AgentDeployment replicas.
-type AgentService struct {
+// ArkonisService routes incoming tasks to a pool of ArkonisDeployment replicas.
+type ArkonisService struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +required
-	Spec AgentServiceSpec `json:"spec"`
+	Spec ArkonisServiceSpec `json:"spec"`
 
 	// +optional
-	Status AgentServiceStatus `json:"status,omitempty"`
+	Status ArkonisServiceStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AgentServiceList contains a list of AgentService.
-type AgentServiceList struct {
+// ArkonisServiceList contains a list of ArkonisService.
+type ArkonisServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AgentService `json:"items"`
+	Items           []ArkonisService `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AgentService{}, &AgentServiceList{})
+	SchemeBuilder.Register(&ArkonisService{}, &ArkonisServiceList{})
 }

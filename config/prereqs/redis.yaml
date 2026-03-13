@@ -3,7 +3,7 @@
 # This is a single-replica Redis instance suitable for development and small
 # deployments.  For production, replace with a HA setup (Redis Sentinel /
 # Redis Cluster) or a managed service (ElastiCache, Upstash, etc.) and update
-# TASK_QUEUE_URL in the agentops-operator-api-keys Secret accordingly.
+# TASK_QUEUE_URL in the arkonis-api-keys Secret accordingly.
 #
 # Apply:  kubectl apply -f config/prereqs/redis.yaml
 ---
@@ -19,7 +19,7 @@ metadata:
   namespace: agent-infra
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/managed-by: agentops-operator
+    app.kubernetes.io/managed-by: arkonis-operator
 spec:
   serviceName: redis
   replicas: 1
@@ -70,7 +70,7 @@ metadata:
   namespace: agent-infra
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/managed-by: agentops-operator
+    app.kubernetes.io/managed-by: arkonis-operator
 spec:
   selector:
     app.kubernetes.io/name: redis

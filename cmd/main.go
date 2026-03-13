@@ -35,8 +35,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
-	"github.com/agentops-io/agentops-operator/internal/controller"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
+	"github.com/arkonis-dev/arkonis-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -48,7 +48,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(agentopsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(arkonisv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -80,7 +80,7 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&agentImage, "agent-image", "ghcr.io/agentops-io/agentops-runtime:latest",
+	flag.StringVar(&agentImage, "agent-image", "ghcr.io/arkonis-dev/arkonis-runtime:latest",
 		"Container image used for agent runtime pods.")
 	opts := zap.Options{
 		Development: true,
@@ -163,7 +163,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "a7754879.agentops.io",
+		LeaderElectionID:       "a7754879.arkonis.dev",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -181,41 +181,41 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.AgentDeploymentReconciler{
+	if err := (&controller.ArkonisDeploymentReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
 		AgentImage: agentImage,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "AgentDeployment")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisDeployment")
 		os.Exit(1)
 	}
-	if err := (&controller.AgentServiceReconciler{
+	if err := (&controller.ArkonisServiceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "AgentService")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisService")
 		os.Exit(1)
 	}
-	if err := (&controller.AgentConfigReconciler{
+	if err := (&controller.ArkonisConfigReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "AgentConfig")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisConfig")
 		os.Exit(1)
 	}
-	if err := (&controller.AgentPipelineReconciler{
+	if err := (&controller.ArkonisPipelineReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
 		TaskQueueURL: os.Getenv("TASK_QUEUE_URL"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "AgentPipeline")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisPipeline")
 		os.Exit(1)
 	}
-	if err := (&controller.AgentMemoryReconciler{
+	if err := (&controller.ArkonisMemoryReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "AgentMemory")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisMemory")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

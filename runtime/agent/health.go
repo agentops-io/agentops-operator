@@ -14,7 +14,7 @@ const defaultValidatorPrompt = "Reply with exactly one word: HEALTHY"
 //   - GET /healthz — basic liveness: always 200 if the process is running.
 //   - GET /readyz  — semantic readiness: sends a prompt to the Anthropic API and
 //     checks that the response contains "HEALTHY". The prompt is taken from
-//     AGENT_VALIDATOR_PROMPT (set via AgentDeployment.spec.livenessProbe.validatorPrompt),
+//     AGENT_VALIDATOR_PROMPT (set via ArkonisDeployment.spec.livenessProbe.validatorPrompt),
 //     falling back to a built-in default. This validates that the model and API key
 //     are correctly configured before the pod accepts tasks.
 func ServeHealthProbe(addr string, runner *Runner, validatorPrompt string) {

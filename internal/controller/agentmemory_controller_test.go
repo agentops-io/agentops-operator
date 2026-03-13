@@ -27,30 +27,30 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
-var _ = Describe("AgentMemory Controller", func() {
+var _ = Describe("ArkonisMemory Controller", func() {
 	const (
 		namespace = "default"
 	)
 	ctx := context.Background()
 
-	newReconciler := func() *AgentMemoryReconciler {
-		return &AgentMemoryReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+	newReconciler := func() *ArkonisMemoryReconciler {
+		return &ArkonisMemoryReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 	}
 
-	reconcileAndFetch := func(name string) *agentopsv1alpha1.AgentMemory {
+	reconcileAndFetch := func(name string) *arkonisv1alpha1.ArkonisMemory {
 		nn := types.NamespacedName{Name: name, Namespace: namespace}
 		_, err := newReconciler().Reconcile(ctx, reconcile.Request{NamespacedName: nn})
 		Expect(err).NotTo(HaveOccurred())
-		mem := &agentopsv1alpha1.AgentMemory{}
+		mem := &arkonisv1alpha1.ArkonisMemory{}
 		Expect(k8sClient.Get(ctx, nn, mem)).To(Succeed())
 		return mem
 	}
 
 	cleanup := func(name string) {
-		mem := &agentopsv1alpha1.AgentMemory{}
+		mem := &arkonisv1alpha1.ArkonisMemory{}
 		nn := types.NamespacedName{Name: name, Namespace: namespace}
 		if err := k8sClient.Get(ctx, nn, mem); err == nil {
 			Expect(k8sClient.Delete(ctx, mem)).To(Succeed())
@@ -62,10 +62,10 @@ var _ = Describe("AgentMemory Controller", func() {
 		AfterEach(func() { cleanup(name) })
 
 		It("should set Ready=True with no extra config required", func() {
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendInContext,
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendInContext,
 				},
 			})).To(Succeed())
 
@@ -82,12 +82,12 @@ var _ = Describe("AgentMemory Controller", func() {
 		AfterEach(func() { cleanup(name) })
 
 		It("should set Ready=True when secretRef is provided", func() {
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendRedis,
-					Redis: &agentopsv1alpha1.RedisMemoryConfig{
-						SecretRef:  agentopsv1alpha1.LocalObjectReference{Name: "redis-secret"},
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendRedis,
+					Redis: &arkonisv1alpha1.RedisMemoryConfig{
+						SecretRef:  arkonisv1alpha1.LocalObjectReference{Name: "redis-secret"},
 						TTLSeconds: 3600,
 					},
 				},
@@ -100,10 +100,10 @@ var _ = Describe("AgentMemory Controller", func() {
 		})
 
 		It("should set Ready=False when spec.redis is missing", func() {
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendRedis,
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendRedis,
 					// Redis field intentionally omitted
 				},
 			})).To(Succeed())
@@ -117,12 +117,12 @@ var _ = Describe("AgentMemory Controller", func() {
 		})
 
 		It("should set Ready=False when secretRef.name is empty", func() {
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendRedis,
-					Redis: &agentopsv1alpha1.RedisMemoryConfig{
-						SecretRef: agentopsv1alpha1.LocalObjectReference{Name: ""},
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendRedis,
+					Redis: &arkonisv1alpha1.RedisMemoryConfig{
+						SecretRef: arkonisv1alpha1.LocalObjectReference{Name: ""},
 					},
 				},
 			})).To(Succeed())
@@ -140,12 +140,12 @@ var _ = Describe("AgentMemory Controller", func() {
 		AfterEach(func() { cleanup(name) })
 
 		It("should set Ready=True when endpoint is provided", func() {
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendVectorStore,
-					VectorStore: &agentopsv1alpha1.VectorStoreMemoryConfig{
-						Provider:   agentopsv1alpha1.VectorStoreProviderQdrant,
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendVectorStore,
+					VectorStore: &arkonisv1alpha1.VectorStoreMemoryConfig{
+						Provider:   arkonisv1alpha1.VectorStoreProviderQdrant,
 						Endpoint:   "http://qdrant.agent-infra.svc.cluster.local:6333",
 						Collection: "agent-memories",
 					},
@@ -159,10 +159,10 @@ var _ = Describe("AgentMemory Controller", func() {
 		})
 
 		It("should set Ready=False when spec.vectorStore is missing", func() {
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendVectorStore,
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendVectorStore,
 					// VectorStore field intentionally omitted
 				},
 			})).To(Succeed())
@@ -175,12 +175,12 @@ var _ = Describe("AgentMemory Controller", func() {
 		})
 
 		It("should set Ready=False when endpoint is empty", func() {
-			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+			Expect(k8sClient.Create(ctx, &arkonisv1alpha1.ArkonisMemory{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-				Spec: agentopsv1alpha1.AgentMemorySpec{
-					Backend: agentopsv1alpha1.MemoryBackendVectorStore,
-					VectorStore: &agentopsv1alpha1.VectorStoreMemoryConfig{
-						Provider: agentopsv1alpha1.VectorStoreProviderQdrant,
+				Spec: arkonisv1alpha1.ArkonisMemorySpec{
+					Backend: arkonisv1alpha1.MemoryBackendVectorStore,
+					VectorStore: &arkonisv1alpha1.VectorStoreMemoryConfig{
+						Provider: arkonisv1alpha1.VectorStoreProviderQdrant,
 						Endpoint: "", // missing
 					},
 				},
@@ -194,7 +194,7 @@ var _ = Describe("AgentMemory Controller", func() {
 		})
 	})
 
-	Context("when the AgentMemory does not exist", func() {
+	Context("when the ArkonisMemory does not exist", func() {
 		It("should return without error", func() {
 			_, err := newReconciler().Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{Name: "does-not-exist", Namespace: namespace},

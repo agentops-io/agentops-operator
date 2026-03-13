@@ -8,11 +8,11 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -a -trimpath -ldflags="-s -w" \
-    -o /agentops-runtime \
+    -o /arkruntime \
     ./runtime/agent/
 
 FROM gcr.io/distroless/static:nonroot
-COPY --from=builder /agentops-runtime /agentops-runtime
+COPY --from=builder /arkruntime /arkruntime
 EXPOSE 8080
 USER nonroot:nonroot
-ENTRYPOINT ["/agentops-runtime"]
+ENTRYPOINT ["/arkruntime"]

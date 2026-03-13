@@ -1,4 +1,4 @@
-# Contributing to agentops-operator
+# Contributing to arkonis-operator
 
 Thank you for your interest in contributing. This document covers how to get started, the development workflow, and the standards we expect from contributions.
 
@@ -20,8 +20,8 @@ Thank you for your interest in contributing. This document covers how to get sta
 
 ```bash
 # 1. Clone
-git clone https://github.com/agentops-io/agentops-operator.git
-cd agentops-operator
+git clone https://github.com/arkonis-dev/arkonis-operator.git
+cd arkonis-operator
 
 # 2. Start a full local environment (kind cluster + Redis + operator inside the cluster)
 make dev ANTHROPIC_API_KEY=sk-ant-...
@@ -104,12 +104,12 @@ We use **Rebase and merge** for all PRs to keep a linear history on `main`.
 
 ## Reporting bugs
 
-Open a [GitHub issue](https://github.com/agentops-io/agentops-operator/issues/new) with:
+Open a [GitHub issue](https://github.com/arkonis-dev/arkonis-operator/issues/new) with:
 
-- Operator version (`kubectl get deployment -n agentops-system`)
+- Operator version (`kubectl get deployment -n arkonis-system`)
 - Kubernetes version (`kubectl version`)
-- The AgentDeployment / AgentService YAML (redact secrets)
-- Relevant controller logs (`kubectl logs -n agentops-system -l control-plane=controller-manager`)
+- The ArkonisDeployment / ArkonisService YAML (redact secrets)
+- Relevant controller logs (`kubectl logs -n arkonis-system -l control-plane=controller-manager`)
 
 ## Security vulnerabilities
 

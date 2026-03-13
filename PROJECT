@@ -3,46 +3,55 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.13.0
-domain: agentops.io
+domain: arkonis.dev
 layout:
 - go.kubebuilder.io/v4
-projectName: agentops
-repo: github.com/agentops-io/agentops-operator
+projectName: arkonis-operator
+repo: github.com/arkonis-dev/arkonis-operator
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: agentops.io
-  group: agentops
-  kind: AgentDeployment
-  path: github.com/agentops-io/agentops-operator/api/v1alpha1
+  domain: arkonis.dev
+  group: arkonis
+  kind: ArkonisDeployment
+  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: agentops.io
-  group: agentops
-  kind: AgentService
-  path: github.com/agentops-io/agentops-operator/api/v1alpha1
+  domain: arkonis.dev
+  group: arkonis
+  kind: ArkonisService
+  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: agentops.io
-  group: agentops
-  kind: AgentConfig
-  path: github.com/agentops-io/agentops-operator/api/v1alpha1
+  domain: arkonis.dev
+  group: arkonis
+  kind: ArkonisConfig
+  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: agentops.io
-  group: agentops
-  kind: AgentPipeline
-  path: github.com/agentops-io/agentops-operator/api/v1alpha1
+  domain: arkonis.dev
+  group: arkonis
+  kind: ArkonisPipeline
+  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: arkonis.dev
+  group: arkonis
+  kind: ArkonisMemory
+  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

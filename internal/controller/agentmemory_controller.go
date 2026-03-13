@@ -27,24 +27,24 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	agentopsv1alpha1 "github.com/agentops-io/agentops-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
 )
 
-// AgentMemoryReconciler reconciles a AgentMemory object.
-type AgentMemoryReconciler struct {
+// ArkonisMemoryReconciler reconciles a ArkonisMemory object.
+type ArkonisMemoryReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentmemories,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentmemories/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentmemories/finalizers,verbs=update
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentmemories,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentmemories/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=arkonis.dev,resources=agentmemories/finalizers,verbs=update
 
-// AgentMemory is a configuration resource (analogous to PersistentVolumeClaim).
+// ArkonisMemory is a configuration resource (analogous to PersistentVolumeClaim).
 // The reconciler validates the spec and sets a Ready condition.
-// AgentDeployments reference it by name; the operator reads it during pod construction.
-func (r *AgentMemoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	agentMem := &agentopsv1alpha1.AgentMemory{}
+// ArkonisDeployments reference it by name; the operator reads it during pod construction.
+func (r *ArkonisMemoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	agentMem := &arkonisv1alpha1.ArkonisMemory{}
 	if err := r.Get(ctx, req.NamespacedName, agentMem); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -74,39 +74,39 @@ func (r *AgentMemoryReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: agentMem.Generation,
 		Reason:             "Accepted",
-		Message:            "AgentMemory is valid and available",
+		Message:            "ArkonisMemory is valid and available",
 	})
 
 	return ctrl.Result{}, r.Status().Update(ctx, agentMem)
 }
 
 // validate checks that the spec is consistent (backend-specific config is present).
-func (r *AgentMemoryReconciler) validate(agentMem *agentopsv1alpha1.AgentMemory) error {
+func (r *ArkonisMemoryReconciler) validate(agentMem *arkonisv1alpha1.ArkonisMemory) error {
 	switch agentMem.Spec.Backend {
-	case agentopsv1alpha1.MemoryBackendRedis:
+	case arkonisv1alpha1.MemoryBackendRedis:
 		if agentMem.Spec.Redis == nil {
-			return fmt.Errorf("spec.redis is required when backend is %q", agentopsv1alpha1.MemoryBackendRedis)
+			return fmt.Errorf("spec.redis is required when backend is %q", arkonisv1alpha1.MemoryBackendRedis)
 		}
 		if agentMem.Spec.Redis.SecretRef.Name == "" {
 			return fmt.Errorf("spec.redis.secretRef.name is required")
 		}
-	case agentopsv1alpha1.MemoryBackendVectorStore:
+	case arkonisv1alpha1.MemoryBackendVectorStore:
 		if agentMem.Spec.VectorStore == nil {
-			return fmt.Errorf("spec.vectorStore is required when backend is %q", agentopsv1alpha1.MemoryBackendVectorStore)
+			return fmt.Errorf("spec.vectorStore is required when backend is %q", arkonisv1alpha1.MemoryBackendVectorStore)
 		}
 		if agentMem.Spec.VectorStore.Endpoint == "" {
 			return fmt.Errorf("spec.vectorStore.endpoint is required")
 		}
-	case agentopsv1alpha1.MemoryBackendInContext:
+	case arkonisv1alpha1.MemoryBackendInContext:
 		// No additional config required.
 	}
 	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AgentMemoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ArkonisMemoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&agentopsv1alpha1.AgentMemory{}).
+		For(&arkonisv1alpha1.ArkonisMemory{}).
 		Named("agentmemory").
 		Complete(r)
 }

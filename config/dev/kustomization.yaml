@@ -3,7 +3,7 @@ resources:
 
 images:
   - name: controller
-    newName: agentops-operator
+    newName: arkonis-operator
     newTag: dev
 
 patches:

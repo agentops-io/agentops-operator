@@ -2,10 +2,10 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/agentops.agentops.io_agentdeployments.yaml
-- bases/agentops.agentops.io_agentservices.yaml
-- bases/agentops.agentops.io_agentconfigs.yaml
-- bases/agentops.agentops.io_agentpipelines.yaml
+- bases/arkonis.dev_agentdeployments.yaml
+- bases/arkonis.dev_agentservices.yaml
+- bases/arkonis.dev_agentconfigs.yaml
+- bases/arkonis.dev_agentpipelines.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

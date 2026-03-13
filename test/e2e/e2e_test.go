@@ -30,20 +30,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/agentops-io/agentops-operator/test/utils"
+	"github.com/arkonis-dev/arkonis-operator/test/utils"
 )
 
 // namespace where the project is deployed in
-const namespace = "agentops-system"
+const namespace = "arkonis-system"
 
 // serviceAccountName created for the project
-const serviceAccountName = "agentops-controller-manager"
+const serviceAccountName = "arkonis-controller-manager"
 
 // metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "agentops-controller-manager-metrics-service"
+const metricsServiceName = "arkonis-controller-manager-metrics-service"
 
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
-const metricsRoleBindingName = "agentops-metrics-binding"
+const metricsRoleBindingName = "arkonis-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
@@ -176,7 +176,7 @@ var _ = Describe("Manager", Ordered, func() {
 		It("should ensure the metrics endpoint is serving metrics", func() {
 			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
 			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
-				"--clusterrole=agentops-metrics-reader",
+				"--clusterrole=arkonis-metrics-reader",
 				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
 			)
 			_, err := utils.Run(cmd)
@@ -270,13 +270,13 @@ var _ = Describe("Manager", Ordered, func() {
 
 		// +kubebuilder:scaffold:e2e-webhooks-checks
 
-		It("should reconcile an AgentDeployment and create a backing Deployment", func() {
+		It("should reconcile an ArkonisDeployment and create a backing Deployment", func() {
 			const agentDepName = "e2e-research-agent"
 
-			By("applying a sample AgentDeployment CR")
+			By("applying a sample ArkonisDeployment CR")
 			sampleYAML := fmt.Sprintf(`
-apiVersion: agentops.agentops.io/v1alpha1
-kind: AgentDeployment
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkonisDeployment
 metadata:
   name: %s
   namespace: %s
@@ -290,7 +290,7 @@ spec:
 
 			cmd := exec.Command("kubectl", "apply", "-f", sampleFile)
 			_, err := utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "Failed to apply AgentDeployment")
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply ArkonisDeployment")
 
 			By("waiting for the backing k8s Deployment to be created")
 			verifyDeploymentCreated := func(g Gomega) {
@@ -313,21 +313,21 @@ spec:
 			}
 			Eventually(verifyReconcileMetric).Should(Succeed())
 
-			By("cleaning up the AgentDeployment")
+			By("cleaning up the ArkonisDeployment")
 			cmd = exec.Command("kubectl", "delete", "agentdeployment", agentDepName, "-n", namespace)
 			_, _ = utils.Run(cmd)
 		})
 
-		It("should reconcile an AgentService and create a backing k8s Service", func() {
+		It("should reconcile an ArkonisService and create a backing k8s Service", func() {
 			const (
 				agentDepName = "e2e-service-backing-agent"
 				agentSvcName = "e2e-agent-service"
 			)
 
-			By("creating a backing AgentDeployment")
+			By("creating a backing ArkonisDeployment")
 			depYAML := fmt.Sprintf(`
-apiVersion: agentops.agentops.io/v1alpha1
-kind: AgentDeployment
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkonisDeployment
 metadata:
   name: %s
   namespace: %s
@@ -342,10 +342,10 @@ spec:
 			_, err := utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("applying a sample AgentService CR")
+			By("applying a sample ArkonisService CR")
 			svcYAML := fmt.Sprintf(`
-apiVersion: agentops.agentops.io/v1alpha1
-kind: AgentService
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkonisService
 metadata:
   name: %s
   namespace: %s
@@ -362,7 +362,7 @@ spec:
 			Expect(os.WriteFile(svcFile, []byte(svcYAML), 0o644)).To(Succeed())
 			cmd = exec.Command("kubectl", "apply", "-f", svcFile)
 			_, err = utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "Failed to apply AgentService")
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply ArkonisService")
 
 			By("waiting for the backing k8s Service to be created")
 			verifyServiceCreated := func(g Gomega) {

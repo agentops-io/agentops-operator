@@ -13,7 +13,7 @@ This project is in active development. Only the latest release receives security
 Please **do not** open a public GitHub issue for security vulnerabilities.
 
 Instead, report them privately via GitHub's security advisory feature:
-**[Report a vulnerability](https://github.com/agentops-io/agentops-operator/security/advisories/new)**
+**[Report a vulnerability](https://github.com/arkonis-dev/arkonis-operator/security/advisories/new)**
 
 You can expect an acknowledgement within **48 hours** and a status update within **7 days**.
 

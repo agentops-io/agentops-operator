@@ -4,32 +4,35 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: agentmemories.agentops.agentops.io
+  name: arkonisdeployments.arkonis.dev
 spec:
-  group: agentops.agentops.io
+  group: arkonis.dev
   names:
-    kind: AgentMemory
-    listKind: AgentMemoryList
-    plural: agentmemories
+    kind: ArkonisDeployment
+    listKind: ArkonisDeploymentList
+    plural: arkonisdeployments
     shortNames:
-    - agmem
-    singular: agentmemory
+    - aodep
+    singular: arkonisdeployment
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.backend
-      name: Backend
+    - jsonPath: .spec.model
+      name: Model
       type: string
+    - jsonPath: .spec.replicas
+      name: Replicas
+      type: integer
+    - jsonPath: .status.readyReplicas
+      name: Ready
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          AgentMemory defines the persistent memory backend for agent instances.
-          Reference it from an AgentDeployment via spec.memoryRef to give agents
-          durable memory across tasks.
+        description: ArkonisDeployment manages a pool of LLM agent instances.
         properties:
           apiVersion:
             description: |-
@@ -49,87 +52,109 @@ spec:
           metadata:
             type: object
           spec:
-            description: AgentMemorySpec defines the desired memory configuration.
+            description: ArkonisDeploymentSpec defines the desired state of ArkonisDeployment.
             properties:
-              backend:
-                description: Backend selects the memory storage strategy.
-                enum:
-                - in-context
-                - vector-store
-                - redis
-                type: string
-              redis:
-                description: Redis configures the Redis backend. Required when backend
-                  is "redis".
+              configRef:
+                description: ConfigRef optionally references an ArkonisConfig for
+                  shared settings.
                 properties:
-                  maxEntries:
-                    description: MaxEntries caps the number of stored entries per
-                      agent instance. 0 means unlimited.
-                    type: integer
-                  secretRef:
-                    description: SecretRef names a Secret whose REDIS_URL key is injected
-                      into agent pods.
-                    properties:
-                      name:
-                        description: Name of the referenced object.
-                        type: string
-                    required:
-                    - name
-                    type: object
-                  ttlSeconds:
-                    default: 3600
-                    description: TTLSeconds is how long memory entries are retained.
-                      0 means no expiry.
-                    type: integer
+                  name:
+                    description: Name of the referenced object.
+                    type: string
                 required:
-                - secretRef
+                - name
                 type: object
-              vectorStore:
-                description: VectorStore configures the vector-store backend. Required
-                  when backend is "vector-store".
+              limits:
+                description: Limits constrains agent resource usage.
                 properties:
-                  collection:
-                    default: agent-memories
-                    description: Collection is the collection/index name to store
-                      memories in.
-                    type: string
-                  endpoint:
-                    description: Endpoint is the base URL of the vector database (e.g.
-                      "http://qdrant:6333").
-                    type: string
-                  provider:
-                    description: Provider is the vector database to use.
+                  maxConcurrentTasks:
+                    default: 5
+                    description: MaxConcurrentTasks is the maximum number of tasks
+                      processed in parallel per replica.
+                    type: integer
+                  maxTokensPerCall:
+                    default: 8000
+                    description: MaxTokensPerCall is the maximum number of tokens
+                      per Anthropic API call.
+                    type: integer
+                  timeoutSeconds:
+                    default: 120
+                    description: TimeoutSeconds is the per-task deadline.
+                    type: integer
+                type: object
+              livenessProbe:
+                description: LivenessProbe defines how agent health is evaluated.
+                properties:
+                  intervalSeconds:
+                    default: 30
+                    description: IntervalSeconds is how often the probe runs.
+                    type: integer
+                  type:
+                    description: 'Type is the probe strategy: "semantic" (LLM-based)
+                      or "ping" (HTTP).'
                     enum:
-                    - qdrant
-                    - pinecone
-                    - weaviate
+                    - semantic
+                    - ping
                     type: string
-                  secretRef:
-                    description: SecretRef optionally names a Secret whose VECTOR_STORE_API_KEY
-                      is injected into agent pods.
-                    properties:
-                      name:
-                        description: Name of the referenced object.
-                        type: string
-                    required:
-                    - name
-                    type: object
-                  ttlSeconds:
-                    description: TTLSeconds is how long memory entries are retained.
-                      0 means no expiry.
-                    type: integer
+                  validatorPrompt:
+                    description: ValidatorPrompt is the prompt sent when Type is "semantic".
+                    type: string
                 required:
-                - endpoint
-                - provider
+                - type
                 type: object
+              mcpServers:
+                description: MCPServers lists the MCP tool servers available to this
+                  agent.
+                items:
+                  description: MCPServerSpec defines one MCP tool server.
+                  properties:
+                    name:
+                      description: Name is a human-readable identifier for this MCP
+                        server.
+                      type: string
+                    url:
+                      description: URL is the SSE endpoint of the MCP server.
+                      type: string
+                  required:
+                  - name
+                  - url
+                  type: object
+                type: array
+              memoryRef:
+                description: |-
+                  MemoryRef optionally references an ArkonisMemory that defines the persistent
+                  memory backend for agent instances. When set, the operator injects memory
+                  connection details as environment variables into agent pods.
+                properties:
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - name
+                type: object
+              model:
+                description: Model is the LLM model ID (e.g. "claude-sonnet-4-20250514").
+                minLength: 1
+                type: string
+              replicas:
+                default: 1
+                description: Replicas is the number of agent instances to run.
+                format: int32
+                maximum: 50
+                minimum: 0
+                type: integer
+              systemPrompt:
+                description: SystemPrompt is injected as the agent's system message.
+                type: string
             required:
-            - backend
+            - model
+            - systemPrompt
             type: object
           status:
-            description: AgentMemoryStatus defines the observed state of AgentMemory.
+            description: ArkonisDeploymentStatus defines the observed state of ArkonisDeployment.
             properties:
               conditions:
-                description: Conditions reflect the current state of the AgentMemory.
+                description: Conditions reflect the current state of the ArkonisDeployment.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -193,6 +218,16 @@ spec:
                   reflects.
                 format: int64
                 type: integer
+              readyReplicas:
+                description: ReadyReplicas is the number of agent pods ready to accept
+                  tasks.
+                format: int32
+                type: integer
+              replicas:
+                description: Replicas is the total number of agent pods (ready or
+                  not).
+                format: int32
+                type: integer
             type: object
         required:
         - spec
@@ -200,4 +235,7 @@ spec:
     served: true
     storage: true
     subresources:
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
       status: {}

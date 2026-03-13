@@ -4,32 +4,36 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: agentconfigs.agentops.agentops.io
+  name: arkonisservices.arkonis.dev
 spec:
-  group: agentops.agentops.io
+  group: arkonis.dev
   names:
-    kind: AgentConfig
-    listKind: AgentConfigList
-    plural: agentconfigs
+    kind: ArkonisService
+    listKind: ArkonisServiceList
+    plural: arkonisservices
     shortNames:
-    - agcfg
-    singular: agentconfig
+    - aosvc
+    singular: arkonisservice
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.memoryBackend
-      name: Memory
+    - jsonPath: .spec.selector.agentDeployment
+      name: Deployment
       type: string
-    - jsonPath: .spec.outputFormat
-      name: OutputFormat
+    - jsonPath: .spec.routing.strategy
+      name: Strategy
       type: string
+    - jsonPath: .status.readyReplicas
+      name: Ready
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AgentConfig holds shared configuration consumed by AgentDeployments.
+        description: ArkonisService routes incoming tasks to a pool of ArkonisDeployment
+          replicas.
         properties:
           apiVersion:
             description: |-
@@ -49,42 +53,63 @@ spec:
           metadata:
             type: object
           spec:
-            description: AgentConfigSpec defines the shared configuration values.
+            description: ArkonisServiceSpec defines the desired state of ArkonisService.
             properties:
-              memoryBackend:
-                default: in-context
-                description: MemoryBackend defines where agent memory is stored.
-                enum:
-                - in-context
-                - vector-store
-                - redis
-                type: string
-              outputFormat:
-                description: OutputFormat specifies the expected output format (e.g.
-                  "structured-json").
-                type: string
-              promptFragments:
-                description: PromptFragments holds reusable prompt snippets.
+              ports:
+                description: Ports lists the network ports exposed by this service.
+                items:
+                  description: ArkonisServicePort defines a port exposed by the ArkonisService.
+                  properties:
+                    port:
+                      description: Port is the network port number.
+                      format: int32
+                      maximum: 65535
+                      minimum: 1
+                      type: integer
+                    protocol:
+                      description: 'Protocol is the communication protocol: "A2A"
+                        (agent-to-agent) or "HTTP" (external).'
+                      enum:
+                      - A2A
+                      - HTTP
+                      type: string
+                  required:
+                  - port
+                  - protocol
+                  type: object
+                type: array
+              routing:
+                description: Routing configures how incoming tasks are distributed.
                 properties:
-                  outputRules:
-                    description: OutputRules defines output format constraints appended
-                      to the system prompt.
-                    type: string
-                  persona:
-                    description: Persona is a persona/role description prepended to
-                      the system prompt.
+                  strategy:
+                    default: round-robin
+                    description: Strategy controls how tasks are distributed across
+                      agent replicas.
+                    enum:
+                    - round-robin
+                    - least-busy
+                    - random
                     type: string
                 type: object
-              temperature:
-                description: Temperature controls response randomness (0.0–1.0).
-                pattern: ^(0(\.[0-9]+)?|1(\.0+)?)$
-                type: string
+              selector:
+                description: Selector identifies the ArkonisDeployment this service
+                  routes tasks to.
+                properties:
+                  agentDeployment:
+                    description: ArkonisDeployment is the name of the ArkonisDeployment
+                      to route tasks to.
+                    type: string
+                required:
+                - agentDeployment
+                type: object
+            required:
+            - selector
             type: object
           status:
-            description: AgentConfigStatus defines the observed state of AgentConfig.
+            description: ArkonisServiceStatus defines the observed state of ArkonisService.
             properties:
               conditions:
-                description: Conditions reflect the current state of the AgentConfig.
+                description: Conditions reflect the current state of the ArkonisService.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -147,6 +172,11 @@ spec:
                 description: ObservedGeneration is the .metadata.generation this status
                   reflects.
                 format: int64
+                type: integer
+              readyReplicas:
+                description: ReadyReplicas is the number of ready agent replicas currently
+                  backing this service.
+                format: int32
                 type: integer
             type: object
         required:

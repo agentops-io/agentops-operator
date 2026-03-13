@@ -63,8 +63,8 @@ type VectorStoreMemoryConfig struct {
 	TTLSeconds int `json:"ttlSeconds,omitempty"`
 }
 
-// AgentMemorySpec defines the desired memory configuration.
-type AgentMemorySpec struct {
+// ArkonisMemorySpec defines the desired memory configuration.
+type ArkonisMemorySpec struct {
 	// Backend selects the memory storage strategy.
 	// +kubebuilder:validation:Required
 	Backend MemoryBackend `json:"backend"`
@@ -76,12 +76,12 @@ type AgentMemorySpec struct {
 	VectorStore *VectorStoreMemoryConfig `json:"vectorStore,omitempty"`
 }
 
-// AgentMemoryStatus defines the observed state of AgentMemory.
-type AgentMemoryStatus struct {
+// ArkonisMemoryStatus defines the observed state of ArkonisMemory.
+type ArkonisMemoryStatus struct {
 	// ObservedGeneration is the .metadata.generation this status reflects.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Conditions reflect the current state of the AgentMemory.
+	// Conditions reflect the current state of the ArkonisMemory.
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -91,33 +91,33 @@ type AgentMemoryStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Backend",type=string,JSONPath=`.spec.backend`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-// +kubebuilder:resource:shortName=agmem,scope=Namespaced
+// +kubebuilder:resource:shortName=aomem,scope=Namespaced
 
-// AgentMemory defines the persistent memory backend for agent instances.
-// Reference it from an AgentDeployment via spec.memoryRef to give agents
+// ArkonisMemory defines the persistent memory backend for agent instances.
+// Reference it from an ArkonisDeployment via spec.memoryRef to give agents
 // durable memory across tasks.
-type AgentMemory struct {
+type ArkonisMemory struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +required
-	Spec AgentMemorySpec `json:"spec"`
+	Spec ArkonisMemorySpec `json:"spec"`
 
 	// +optional
-	Status AgentMemoryStatus `json:"status,omitempty"`
+	Status ArkonisMemoryStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AgentMemoryList contains a list of AgentMemory.
-type AgentMemoryList struct {
+// ArkonisMemoryList contains a list of ArkonisMemory.
+type ArkonisMemoryList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AgentMemory `json:"items"`
+	Items           []ArkonisMemory `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AgentMemory{}, &AgentMemoryList{})
+	SchemeBuilder.Register(&ArkonisMemory{}, &ArkonisMemoryList{})
 }

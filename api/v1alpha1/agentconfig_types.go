@@ -38,8 +38,8 @@ type PromptFragments struct {
 	OutputRules string `json:"outputRules,omitempty"`
 }
 
-// AgentConfigSpec defines the shared configuration values.
-type AgentConfigSpec struct {
+// ArkonisConfigSpec defines the shared configuration values.
+type ArkonisConfigSpec struct {
 	// Temperature controls response randomness (0.0–1.0).
 	// +kubebuilder:validation:Pattern=`^(0(\.[0-9]+)?|1(\.0+)?)$`
 	Temperature string `json:"temperature,omitempty"`
@@ -55,11 +55,11 @@ type AgentConfigSpec struct {
 	PromptFragments PromptFragments `json:"promptFragments,omitempty"`
 }
 
-// AgentConfigStatus defines the observed state of AgentConfig.
-type AgentConfigStatus struct {
+// ArkonisConfigStatus defines the observed state of ArkonisConfig.
+type ArkonisConfigStatus struct {
 	// ObservedGeneration is the .metadata.generation this status reflects.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Conditions reflect the current state of the AgentConfig.
+	// Conditions reflect the current state of the ArkonisConfig.
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -70,31 +70,31 @@ type AgentConfigStatus struct {
 // +kubebuilder:printcolumn:name="Memory",type=string,JSONPath=`.spec.memoryBackend`
 // +kubebuilder:printcolumn:name="OutputFormat",type=string,JSONPath=`.spec.outputFormat`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-// +kubebuilder:resource:shortName=agcfg,scope=Namespaced
+// +kubebuilder:resource:shortName=aocfg,scope=Namespaced
 
-// AgentConfig holds shared configuration consumed by AgentDeployments.
-type AgentConfig struct {
+// ArkonisConfig holds shared configuration consumed by ArkonisDeployments.
+type ArkonisConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +required
-	Spec AgentConfigSpec `json:"spec"`
+	Spec ArkonisConfigSpec `json:"spec"`
 
 	// +optional
-	Status AgentConfigStatus `json:"status,omitempty"`
+	Status ArkonisConfigStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AgentConfigList contains a list of AgentConfig.
-type AgentConfigList struct {
+// ArkonisConfigList contains a list of ArkonisConfig.
+type ArkonisConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AgentConfig `json:"items"`
+	Items           []ArkonisConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AgentConfig{}, &AgentConfigList{})
+	SchemeBuilder.Register(&ArkonisConfig{}, &ArkonisConfigList{})
 }

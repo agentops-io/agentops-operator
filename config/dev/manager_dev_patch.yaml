@@ -12,7 +12,7 @@ spec:
           args:
             - --leader-elect
             - --health-probe-bind-address=:8081
-            - --agent-image=agentops-runtime:dev
+            - --agent-image=arkonis-runtime:dev
           env:
             - name: TASK_QUEUE_URL
               value: redis.agent-infra.svc.cluster.local:6379
