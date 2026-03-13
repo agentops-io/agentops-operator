@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          imagePullPolicy: Never
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+            - --agent-image=agentops-runtime:dev
+          env:
+            - name: TASK_QUEUE_URL
+              value: redis.agent-infra.svc.cluster.local:6379

@@ -23,16 +23,17 @@ Thank you for your interest in contributing. This document covers how to get sta
 git clone https://github.com/agentops-io/agentops-operator.git
 cd agentops-operator
 
-# 2. Install dependencies
-go mod download
+# 2. Start a full local environment (kind cluster + Redis + operator inside the cluster)
+make dev ANTHROPIC_API_KEY=sk-ant-...
 
-# 3. Spin up a local cluster
-kind create cluster --name agentops-dev
+# Tear down when done
+make dev-down
+```
 
-# 4. Install CRDs
-make install
+For faster iteration on controller code without rebuilding Docker images, you can run the operator on your host instead:
 
-# 5. Run the operator locally (connects to the kind cluster)
+```bash
+# Requires a cluster with CRDs and Redis already installed (e.g. from a previous make dev)
 make run
 ```
 

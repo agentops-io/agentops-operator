@@ -67,6 +67,50 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
+DEV_CLUSTER  ?= agentops-dev
+DEV_IMG      ?= agentops-operator:dev
+DEV_AGENT_IMG ?= agentops-runtime:dev
+
+.PHONY: dev
+dev: manifests generate kustomize ## Start a local dev environment in Kind. Usage: make dev ANTHROPIC_API_KEY=sk-ant-...
+	@if [ -z "$(ANTHROPIC_API_KEY)" ]; then \
+		echo "Error: ANTHROPIC_API_KEY is required."; \
+		echo "Usage: make dev ANTHROPIC_API_KEY=sk-ant-..."; \
+		exit 1; \
+	fi
+	@echo "==> Creating Kind cluster '$(DEV_CLUSTER)'..."
+	@$(KIND) get clusters 2>/dev/null | grep -q "^$(DEV_CLUSTER)$$" || $(KIND) create cluster --name $(DEV_CLUSTER)
+	@echo "==> Building images..."
+	$(CONTAINER_TOOL) build -t $(DEV_IMG) .
+	$(CONTAINER_TOOL) build -f Dockerfile.agent -t $(DEV_AGENT_IMG) .
+	@echo "==> Loading images into Kind..."
+	$(KIND) load docker-image $(DEV_IMG) --name $(DEV_CLUSTER)
+	$(KIND) load docker-image $(DEV_AGENT_IMG) --name $(DEV_CLUSTER)
+	@echo "==> Installing CRDs..."
+	$(MAKE) install
+	@echo "==> Deploying Redis..."
+	$(KUBECTL) apply -f config/prereqs/redis.yaml
+	@echo "==> Deploying operator..."
+	"$(KUSTOMIZE)" build config/dev | $(KUBECTL) apply -f -
+	@echo "==> Creating API key secret..."
+	$(KUBECTL) create secret generic agentops-operator-api-keys \
+		--from-literal=ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
+		--from-literal=TASK_QUEUE_URL=redis.agent-infra.svc.cluster.local:6379 \
+		--dry-run=client -o yaml | $(KUBECTL) apply -f -
+	@echo "==> Waiting for operator to be ready..."
+	$(KUBECTL) wait --for=condition=available --timeout=120s \
+		deployment/agentops-controller-manager -n agentops-system
+	@echo ""
+	@echo "Dev environment ready."
+	@echo "  kubectl apply -f config/samples/agentops_v1alpha1_agentdeployment.yaml"
+	@echo "  kubectl get agdep -w"
+	@echo ""
+	@echo "Tear down: make dev-down"
+
+.PHONY: dev-down
+dev-down: ## Tear down the local dev Kind cluster.
+	$(KIND) delete cluster --name $(DEV_CLUSTER)
+
 KIND_CLUSTER ?= agentops-test-e2e
 
 .PHONY: setup-test-e2e
