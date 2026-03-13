@@ -170,4 +170,92 @@ var _ = Describe("AgentDeployment Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("When an AgentDeployment references an AgentMemory", func() {
+		const (
+			agentName = "mem-agent"
+			memName   = "test-mem"
+		)
+		agentKey := types.NamespacedName{Name: agentName, Namespace: namespace}
+		memKey := types.NamespacedName{Name: memName, Namespace: namespace}
+		backingKey := types.NamespacedName{Name: agentName + "-agent", Namespace: namespace}
+
+		BeforeEach(func() {
+			By("creating an AgentMemory with redis backend")
+			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentMemory{
+				ObjectMeta: metav1.ObjectMeta{Name: memName, Namespace: namespace},
+				Spec: agentopsv1alpha1.AgentMemorySpec{
+					Backend: agentopsv1alpha1.MemoryBackendRedis,
+					Redis: &agentopsv1alpha1.RedisMemoryConfig{
+						SecretRef:  agentopsv1alpha1.LocalObjectReference{Name: "redis-secret"},
+						TTLSeconds: 1800,
+					},
+				},
+			})).To(Succeed())
+
+			By("creating an AgentDeployment that references the AgentMemory")
+			replicas := int32(1)
+			Expect(k8sClient.Create(ctx, &agentopsv1alpha1.AgentDeployment{
+				ObjectMeta: metav1.ObjectMeta{Name: agentName, Namespace: namespace},
+				Spec: agentopsv1alpha1.AgentDeploymentSpec{
+					Replicas:     &replicas,
+					Model:        "claude-haiku-4-5",
+					SystemPrompt: "You are a helpful assistant.",
+					MemoryRef:    &agentopsv1alpha1.LocalObjectReference{Name: memName},
+				},
+			})).To(Succeed())
+		})
+
+		AfterEach(func() {
+			ad := &agentopsv1alpha1.AgentDeployment{}
+			if err := k8sClient.Get(ctx, agentKey, ad); err == nil {
+				Expect(k8sClient.Delete(ctx, ad)).To(Succeed())
+			}
+			mem := &agentopsv1alpha1.AgentMemory{}
+			if err := k8sClient.Get(ctx, memKey, mem); err == nil {
+				Expect(k8sClient.Delete(ctx, mem)).To(Succeed())
+			}
+			dep := &appsv1.Deployment{}
+			if err := k8sClient.Get(ctx, backingKey, dep); err == nil {
+				Expect(k8sClient.Delete(ctx, dep)).To(Succeed())
+			}
+		})
+
+		It("should inject AGENT_MEMORY_BACKEND env var into the backing Deployment", func() {
+			reconciler := &AgentDeploymentReconciler{
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				AgentImage: testAgentImage,
+			}
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: agentKey})
+			Expect(err).NotTo(HaveOccurred())
+
+			dep := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, backingKey, dep)).To(Succeed())
+
+			envVars := dep.Spec.Template.Spec.Containers[0].Env
+			envMap := make(map[string]string)
+			for _, e := range envVars {
+				envMap[e.Name] = e.Value
+			}
+
+			Expect(envMap).To(HaveKeyWithValue("AGENT_MEMORY_BACKEND", string(agentopsv1alpha1.MemoryBackendRedis)))
+			Expect(envMap).To(HaveKeyWithValue("AGENT_MEMORY_REDIS_TTL", "1800"))
+		})
+
+		It("should reconcile without error when the referenced AgentMemory does not exist", func() {
+			By("deleting the AgentMemory before reconciling")
+			mem := &agentopsv1alpha1.AgentMemory{}
+			Expect(k8sClient.Get(ctx, memKey, mem)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, mem)).To(Succeed())
+
+			reconciler := &AgentDeploymentReconciler{
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				AgentImage: testAgentImage,
+			}
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: agentKey})
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 })

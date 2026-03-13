@@ -4,4 +4,5 @@ resources:
 - agentops_v1alpha1_agentservice.yaml
 - agentops_v1alpha1_agentconfig.yaml
 - agentops_v1alpha1_agentpipeline.yaml
+- agentops_v1alpha1_agentmemory.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

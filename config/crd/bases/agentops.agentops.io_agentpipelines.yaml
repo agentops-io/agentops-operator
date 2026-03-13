@@ -91,6 +91,13 @@ spec:
                         the pipeline.
                       minLength: 1
                       type: string
+                    outputSchema:
+                      description: |-
+                        OutputSchema is an optional JSON Schema string that constrains this step's output.
+                        When set, the schema is appended to the agent prompt and the controller validates
+                        that the response parses as JSON before marking the step Succeeded.
+                        Downstream steps can reference structured fields via "{{ .steps.<name>.data.<field> }}".
+                      type: string
                   required:
                   - agentDeployment
                   - name
@@ -206,8 +213,14 @@ spec:
                       description: Name matches the step name in spec.
                       type: string
                     output:
-                      description: Output is the agent's response once the step has
-                        succeeded.
+                      description: Output is the agent's raw text response once the
+                        step has succeeded.
+                      type: string
+                    outputJSON:
+                      description: |-
+                        OutputJSON is the agent's response as a JSON string, populated when the step
+                        has an OutputSchema and the response is valid JSON. Downstream steps can
+                        reference fields via "{{ .steps.<name>.data.<field> }}".
                       type: string
                     phase:
                       description: Phase is the current execution phase.

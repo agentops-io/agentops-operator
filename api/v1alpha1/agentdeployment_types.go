@@ -89,6 +89,11 @@ type AgentDeploymentSpec struct {
 
 	// ConfigRef optionally references an AgentConfig for shared settings.
 	ConfigRef *LocalObjectReference `json:"configRef,omitempty"`
+
+	// MemoryRef optionally references an AgentMemory that defines the persistent
+	// memory backend for agent instances. When set, the operator injects memory
+	// connection details as environment variables into agent pods.
+	MemoryRef *LocalObjectReference `json:"memoryRef,omitempty"`
 }
 
 // LocalObjectReference identifies an object in the same namespace.

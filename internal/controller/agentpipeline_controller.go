@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"text/template"
@@ -103,41 +104,96 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	// Initialize step statuses on first reconcile.
-	if pipeline.Status.Phase == "" {
-		now := metav1.Now()
-		pipeline.Status.Phase = agentopsv1alpha1.PipelinePhaseRunning
-		pipeline.Status.StartTime = &now
-		pipeline.Status.Steps = make([]agentopsv1alpha1.PipelineStepStatus, len(pipeline.Spec.Steps))
-		for i, step := range pipeline.Spec.Steps {
-			pipeline.Status.Steps[i] = agentopsv1alpha1.PipelineStepStatus{
-				Name:  step.Name,
-				Phase: agentopsv1alpha1.PipelineStepPhasePending,
-			}
-		}
-		r.setCondition(pipeline, metav1.ConditionTrue, "Validated",
-			"Pipeline DAG is valid; execution started")
-	}
+	r.initializeSteps(pipeline)
 
 	// Build lookup maps for convenient access.
-	stepByName := make(map[string]*agentopsv1alpha1.PipelineStep, len(pipeline.Spec.Steps))
-	for i := range pipeline.Spec.Steps {
-		stepByName[pipeline.Spec.Steps[i].Name] = &pipeline.Spec.Steps[i]
-	}
 	statusByName := make(map[string]*agentopsv1alpha1.PipelineStepStatus, len(pipeline.Status.Steps))
 	for i := range pipeline.Status.Steps {
 		statusByName[pipeline.Status.Steps[i].Name] = &pipeline.Status.Steps[i]
 	}
 
-	// Check results for in-flight steps. A Redis error here means we can't
-	// make progress — return the error so controller-runtime applies backoff.
+	// Check results for in-flight steps.
 	if err := r.collectResults(ctx, rdb, pipeline, statusByName); err != nil {
 		logger.Error(err, "collecting step results from Redis")
 		return ctrl.Result{}, fmt.Errorf("collecting step results: %w", err)
 	}
 
-	// Submit tasks for steps whose dependencies are all Succeeded.
+	r.parseOutputJSON(pipeline, statusByName)
+
 	templateData := r.buildTemplateData(pipeline, statusByName)
+	if err := r.submitPendingSteps(ctx, rdb, pipeline, statusByName, templateData, logger); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	r.updatePipelinePhase(pipeline, templateData)
+
+	pipeline.Status.ObservedGeneration = pipeline.Generation
+	if err := r.Status().Update(ctx, pipeline); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if pipeline.Status.Phase == agentopsv1alpha1.PipelinePhaseRunning {
+		return ctrl.Result{RequeueAfter: pipelineRequeueIn}, nil
+	}
+	return ctrl.Result{}, nil
+}
+
+// initializeSteps sets up step statuses and marks the pipeline Running on the first reconcile.
+func (r *AgentPipelineReconciler) initializeSteps(pipeline *agentopsv1alpha1.AgentPipeline) {
+	if pipeline.Status.Phase != "" {
+		return
+	}
+	now := metav1.Now()
+	pipeline.Status.Phase = agentopsv1alpha1.PipelinePhaseRunning
+	pipeline.Status.StartTime = &now
+	pipeline.Status.Steps = make([]agentopsv1alpha1.PipelineStepStatus, len(pipeline.Spec.Steps))
+	for i, step := range pipeline.Spec.Steps {
+		pipeline.Status.Steps[i] = agentopsv1alpha1.PipelineStepStatus{
+			Name:  step.Name,
+			Phase: agentopsv1alpha1.PipelineStepPhasePending,
+		}
+	}
+	r.setCondition(pipeline, metav1.ConditionTrue, "Validated", "Pipeline DAG is valid; execution started")
+}
+
+// parseOutputJSON tries to parse completed step outputs as JSON when the step declared an OutputSchema.
+// Parsed results are stored in OutputJSON so downstream templates can reference individual fields.
+func (r *AgentPipelineReconciler) parseOutputJSON(
+	pipeline *agentopsv1alpha1.AgentPipeline,
+	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
+) {
+	schemaByName := make(map[string]string, len(pipeline.Spec.Steps))
+	for _, step := range pipeline.Spec.Steps {
+		if step.OutputSchema != "" {
+			schemaByName[step.Name] = step.OutputSchema
+		}
+	}
+	for name, st := range statusByName {
+		if _, hasSchema := schemaByName[name]; !hasSchema {
+			continue
+		}
+		if st.Phase != agentopsv1alpha1.PipelineStepPhaseSucceeded || st.Output == "" || st.OutputJSON != "" {
+			continue
+		}
+		var check any
+		if json.Unmarshal([]byte(st.Output), &check) == nil {
+			st.OutputJSON = st.Output
+		}
+	}
+}
+
+// submitPendingSteps enqueues tasks for every step whose dependencies have all succeeded.
+func (r *AgentPipelineReconciler) submitPendingSteps(
+	ctx context.Context,
+	rdb *redis.Client,
+	pipeline *agentopsv1alpha1.AgentPipeline,
+	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
+	templateData map[string]any,
+	logger interface {
+		Info(string, ...any)
+		Error(error, string, ...any)
+	},
+) error {
 	for _, step := range pipeline.Spec.Steps {
 		st := statusByName[step.Name]
 		if st == nil || st.Phase != agentopsv1alpha1.PipelineStepPhasePending {
@@ -146,7 +202,7 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if !r.depsSucceeded(step.DependsOn, statusByName) {
 			continue
 		}
-		prompt, err := r.resolvePrompt(step.Inputs, templateData)
+		prompt, err := r.resolvePrompt(step, templateData)
 		if err != nil {
 			logger.Error(err, "resolving step inputs", "step", step.Name)
 			now := metav1.Now()
@@ -157,11 +213,9 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		taskID, err := r.submitTask(ctx, rdb, prompt)
 		if err != nil {
-			// Redis is unavailable — persist any state collected so far and
-			// return the error so controller-runtime applies exponential backoff.
 			logger.Error(err, "submitting task to Redis", "step", step.Name)
 			_ = r.Status().Update(ctx, pipeline)
-			return ctrl.Result{}, fmt.Errorf("submitting task for step %q: %w", step.Name, err)
+			return fmt.Errorf("submitting task for step %q: %w", step.Name, err)
 		}
 		now := metav1.Now()
 		st.Phase = agentopsv1alpha1.PipelineStepPhaseRunning
@@ -169,10 +223,15 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		st.StartTime = &now
 		logger.Info("submitted task", "step", step.Name, "taskID", taskID)
 	}
+	return nil
+}
 
-	// Determine overall pipeline phase.
-	failed := false
-	allDone := true
+// updatePipelinePhase inspects step statuses and transitions the pipeline to Succeeded or Failed.
+func (r *AgentPipelineReconciler) updatePipelinePhase(
+	pipeline *agentopsv1alpha1.AgentPipeline,
+	templateData map[string]any,
+) {
+	failed, allDone := false, true
 	for _, st := range pipeline.Status.Steps {
 		switch st.Phase {
 		case agentopsv1alpha1.PipelineStepPhaseFailed:
@@ -199,17 +258,6 @@ func (r *AgentPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		r.setCondition(pipeline, metav1.ConditionTrue, "Succeeded", "all steps completed successfully")
 	}
-
-	pipeline.Status.ObservedGeneration = pipeline.Generation
-	if err := r.Status().Update(ctx, pipeline); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Requeue to poll in-flight steps.
-	if pipeline.Status.Phase == agentopsv1alpha1.PipelinePhaseRunning {
-		return ctrl.Result{RequeueAfter: pipelineRequeueIn}, nil
-	}
-	return ctrl.Result{}, nil
 }
 
 // collectResults scans agent-tasks-results for results matching in-flight step task IDs.
@@ -261,13 +309,23 @@ func (r *AgentPipelineReconciler) submitTask(ctx context.Context, rdb *redis.Cli
 }
 
 // buildTemplateData assembles the Go template context from pipeline inputs and completed step outputs.
+// Each step entry exposes:
+//   - .steps.<name>.output  — raw text response
+//   - .steps.<name>.data    — parsed JSON map (only when OutputJSON is populated)
 func (r *AgentPipelineReconciler) buildTemplateData(
 	pipeline *agentopsv1alpha1.AgentPipeline,
 	statusByName map[string]*agentopsv1alpha1.PipelineStepStatus,
 ) map[string]any {
 	stepsData := make(map[string]any, len(pipeline.Status.Steps))
 	for name, st := range statusByName {
-		stepsData[name] = map[string]any{"output": st.Output}
+		entry := map[string]any{"output": st.Output}
+		if st.OutputJSON != "" {
+			var parsed any
+			if json.Unmarshal([]byte(st.OutputJSON), &parsed) == nil {
+				entry["data"] = parsed
+			}
+		}
+		stepsData[name] = entry
 	}
 	return map[string]any{
 		"pipeline": map[string]any{"input": pipeline.Spec.Input},
@@ -276,17 +334,19 @@ func (r *AgentPipelineReconciler) buildTemplateData(
 }
 
 // resolvePrompt resolves all step input templates and concatenates them into a prompt string.
-func (r *AgentPipelineReconciler) resolvePrompt(inputs map[string]string, data map[string]any) (string, error) {
-	if len(inputs) == 0 {
-		return "", nil
-	}
+// When the step has an OutputSchema, the schema is appended as an instruction so the
+// agent knows to respond with JSON matching that shape.
+func (r *AgentPipelineReconciler) resolvePrompt(step agentopsv1alpha1.PipelineStep, data map[string]any) (string, error) {
 	var buf bytes.Buffer
-	for key, tmplStr := range inputs {
+	for key, tmplStr := range step.Inputs {
 		resolved, err := r.resolveTemplate(tmplStr, data)
 		if err != nil {
 			return "", fmt.Errorf("input %q: %w", key, err)
 		}
 		fmt.Fprintf(&buf, "%s: %s\n", key, resolved)
+	}
+	if step.OutputSchema != "" {
+		fmt.Fprintf(&buf, "\nRespond with valid JSON matching this schema:\n%s\n", step.OutputSchema)
 	}
 	return buf.String(), nil
 }

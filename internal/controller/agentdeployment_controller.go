@@ -50,6 +50,7 @@ type AgentDeploymentReconciler struct {
 // +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentdeployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentdeployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentdeployments/finalizers,verbs=update
+// +kubebuilder:rbac:groups=agentops.agentops.io,resources=agentmemories,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
@@ -89,8 +90,25 @@ func (r *AgentDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	// 3b. Optionally load the referenced AgentMemory.
+	var agentMem *agentopsv1alpha1.AgentMemory
+	if agentDep.Spec.MemoryRef != nil {
+		mem := &agentopsv1alpha1.AgentMemory{}
+		if err := r.Get(ctx, client.ObjectKey{
+			Name:      agentDep.Spec.MemoryRef.Name,
+			Namespace: agentDep.Namespace,
+		}, mem); err != nil {
+			if !errors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("fetching AgentMemory %q: %w", agentDep.Spec.MemoryRef.Name, err)
+			}
+			logger.Info("AgentMemory not found, proceeding without it", "memoryRef", agentDep.Spec.MemoryRef.Name)
+		} else {
+			agentMem = mem
+		}
+	}
+
 	// 4. Reconcile the owned k8s Deployment.
-	if err := r.reconcileDeployment(ctx, agentDep, agentCfg); err != nil {
+	if err := r.reconcileDeployment(ctx, agentDep, agentCfg, agentMem); err != nil {
 		logger.Error(err, "failed to reconcile Deployment")
 		r.setCondition(agentDep, "Ready", metav1.ConditionFalse, "ReconcileError", err.Error())
 		_ = r.Status().Update(ctx, agentDep)
@@ -109,8 +127,9 @@ func (r *AgentDeploymentReconciler) reconcileDeployment(
 	ctx context.Context,
 	agentDep *agentopsv1alpha1.AgentDeployment,
 	agentCfg *agentopsv1alpha1.AgentConfig,
+	agentMem *agentopsv1alpha1.AgentMemory,
 ) error {
-	desired := r.buildDeployment(agentDep, agentCfg)
+	desired := r.buildDeployment(agentDep, agentCfg, agentMem)
 
 	if err := ctrl.SetControllerReference(agentDep, desired, r.Scheme); err != nil {
 		return err
@@ -162,7 +181,7 @@ func (r *AgentDeploymentReconciler) syncStatus(
 	return r.Status().Update(ctx, agentDep)
 }
 
-func (r *AgentDeploymentReconciler) buildDeployment(agentDep *agentopsv1alpha1.AgentDeployment, agentCfg *agentopsv1alpha1.AgentConfig) *appsv1.Deployment {
+func (r *AgentDeploymentReconciler) buildDeployment(agentDep *agentopsv1alpha1.AgentDeployment, agentCfg *agentopsv1alpha1.AgentConfig, agentMem *agentopsv1alpha1.AgentMemory) *appsv1.Deployment {
 	labels := map[string]string{
 		"app.kubernetes.io/name":       "agent",
 		"app.kubernetes.io/instance":   agentDep.Name,
@@ -194,7 +213,7 @@ func (r *AgentDeploymentReconciler) buildDeployment(agentDep *agentopsv1alpha1.A
 						Ports: []corev1.ContainerPort{
 							{Name: "health", ContainerPort: 8080, Protocol: corev1.ProtocolTCP},
 						},
-						Env: r.buildEnvVars(agentDep, agentCfg),
+						Env: r.buildEnvVars(agentDep, agentCfg, agentMem),
 						// Shared secret supplies ANTHROPIC_API_KEY and TASK_QUEUE_URL.
 						EnvFrom: []corev1.EnvFromSource{{
 							SecretRef: &corev1.SecretEnvSource{
@@ -235,6 +254,7 @@ func (r *AgentDeploymentReconciler) buildDeployment(agentDep *agentopsv1alpha1.A
 func (r *AgentDeploymentReconciler) buildEnvVars(
 	agentDep *agentopsv1alpha1.AgentDeployment,
 	agentCfg *agentopsv1alpha1.AgentConfig,
+	agentMem *agentopsv1alpha1.AgentMemory,
 ) []corev1.EnvVar {
 	mcpJSON, _ := json.Marshal(agentDep.Spec.MCPServers)
 
@@ -295,6 +315,67 @@ func (r *AgentDeploymentReconciler) buildEnvVars(
 		}
 		if agentCfg.Spec.MemoryBackend != "" {
 			envVars = append(envVars, corev1.EnvVar{Name: "AGENT_MEMORY_BACKEND", Value: string(agentCfg.Spec.MemoryBackend)})
+		}
+	}
+
+	// Propagate AgentMemory config as env vars. AgentMemory takes precedence over
+	// any AGENT_MEMORY_BACKEND set via AgentConfig.
+	if agentMem != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "AGENT_MEMORY_BACKEND",
+			Value: string(agentMem.Spec.Backend),
+		})
+		switch agentMem.Spec.Backend {
+		case agentopsv1alpha1.MemoryBackendRedis:
+			if agentMem.Spec.Redis != nil {
+				// Inject Redis URL from the referenced Secret.
+				envVars = append(envVars, corev1.EnvVar{
+					Name: "AGENT_MEMORY_REDIS_URL",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: agentMem.Spec.Redis.SecretRef.Name},
+							Key:                  "REDIS_URL",
+						},
+					},
+				})
+				if agentMem.Spec.Redis.TTLSeconds > 0 {
+					envVars = append(envVars, corev1.EnvVar{
+						Name:  "AGENT_MEMORY_REDIS_TTL",
+						Value: fmt.Sprintf("%d", agentMem.Spec.Redis.TTLSeconds),
+					})
+				}
+				if agentMem.Spec.Redis.MaxEntries > 0 {
+					envVars = append(envVars, corev1.EnvVar{
+						Name:  "AGENT_MEMORY_REDIS_MAX_ENTRIES",
+						Value: fmt.Sprintf("%d", agentMem.Spec.Redis.MaxEntries),
+					})
+				}
+			}
+		case agentopsv1alpha1.MemoryBackendVectorStore:
+			if agentMem.Spec.VectorStore != nil {
+				envVars = append(envVars,
+					corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_PROVIDER", Value: string(agentMem.Spec.VectorStore.Provider)},
+					corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_ENDPOINT", Value: agentMem.Spec.VectorStore.Endpoint},
+					corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_COLLECTION", Value: agentMem.Spec.VectorStore.Collection},
+				)
+				if agentMem.Spec.VectorStore.SecretRef != nil {
+					envVars = append(envVars, corev1.EnvVar{
+						Name: "AGENT_MEMORY_VECTOR_STORE_API_KEY",
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: agentMem.Spec.VectorStore.SecretRef.Name},
+								Key:                  "VECTOR_STORE_API_KEY",
+							},
+						},
+					})
+				}
+				if agentMem.Spec.VectorStore.TTLSeconds > 0 {
+					envVars = append(envVars, corev1.EnvVar{
+						Name:  "AGENT_MEMORY_VECTOR_STORE_TTL",
+						Value: fmt.Sprintf("%d", agentMem.Spec.VectorStore.TTLSeconds),
+					})
+				}
+			}
 		}
 	}
 

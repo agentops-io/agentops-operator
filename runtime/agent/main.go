@@ -34,7 +34,7 @@ func main() {
 
 	runner := NewRunner(cfg, mcpManager, provider)
 
-	queue := NewTaskQueue(cfg.TaskQueueURL)
+	queue := NewTaskQueue(cfg.TaskQueueURL, cfg.MaxRetries)
 	defer queue.Close()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -73,7 +73,7 @@ func main() {
 			result, err := runner.RunTask(taskCtx, t)
 			if err != nil {
 				logger.Error("task failed", "task_id", t.ID, "error", err)
-				queue.Nack(t.ID, err.Error())
+				queue.Nack(t, err.Error())
 				return
 			}
 			logger.Info("task completed", "task_id", t.ID)

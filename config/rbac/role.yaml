@@ -37,6 +37,7 @@ rules:
   resources:
   - agentconfigs
   - agentdeployments
+  - agentmemories
   - agentpipelines
   - agentservices
   verbs:
@@ -52,6 +53,7 @@ rules:
   resources:
   - agentconfigs/finalizers
   - agentdeployments/finalizers
+  - agentmemories/finalizers
   - agentpipelines/finalizers
   - agentservices/finalizers
   verbs:
@@ -61,6 +63,7 @@ rules:
   resources:
   - agentconfigs/status
   - agentdeployments/status
+  - agentmemories/status
   - agentpipelines/status
   - agentservices/status
   verbs:

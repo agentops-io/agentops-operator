@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -17,20 +18,22 @@ type Task struct {
 
 // TaskQueue wraps a Redis Stream consumer group.
 type TaskQueue struct {
-	rdb      *redis.Client
-	stream   string
-	group    string
-	consumer string
+	rdb        *redis.Client
+	stream     string
+	group      string
+	consumer   string
+	maxRetries int
 }
 
 // NewTaskQueue connects to Redis and ensures the consumer group exists.
-func NewTaskQueue(addr string) *TaskQueue {
+func NewTaskQueue(addr string, maxRetries int) *TaskQueue {
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
 	q := &TaskQueue{
-		rdb:      rdb,
-		stream:   "agent-tasks",
-		group:    "agent-workers",
-		consumer: podName(),
+		rdb:        rdb,
+		stream:     "agent-tasks",
+		group:      "agent-workers",
+		consumer:   podName(),
+		maxRetries: maxRetries,
 	}
 	// Create consumer group if it doesn't exist yet; "$" means only new messages.
 	_ = rdb.XGroupCreateMkStream(context.Background(), q.stream, q.group, "$").Err()
@@ -84,13 +87,47 @@ func (q *TaskQueue) Ack(taskID, result string) {
 	}).Err()
 }
 
-// Nack marks a task as failed so it can be retried or dead-lettered.
-func (q *TaskQueue) Nack(taskID, reason string) {
+// Nack marks a task as failed. If the task has not exceeded maxRetries it is
+// requeued on the main stream with an incremented attempt counter. On the final
+// attempt it is written to the dead-letter stream instead.
+func (q *TaskQueue) Nack(task Task, reason string) {
 	ctx := context.Background()
-	_ = q.rdb.XAck(ctx, q.stream, q.group, taskID).Err()
+
+	attempt := 0
+	if a, err := strconv.Atoi(task.Meta["attempt"]); err == nil {
+		attempt = a
+	}
+
+	// Always acknowledge so the message leaves the PEL.
+	_ = q.rdb.XAck(ctx, q.stream, q.group, task.ID).Err()
+
+	if attempt < q.maxRetries {
+		// Rebuild the message values, preserving all original meta.
+		values := map[string]any{
+			"prompt":  task.Prompt,
+			"attempt": strconv.Itoa(attempt + 1),
+		}
+		for k, v := range task.Meta {
+			if k != "attempt" {
+				values[k] = v
+			}
+		}
+		_ = q.rdb.XAdd(ctx, &redis.XAddArgs{
+			Stream: q.stream,
+			Values: values,
+		}).Err()
+		return
+	}
+
+	// Final failure — dead-letter.
 	_ = q.rdb.XAdd(ctx, &redis.XAddArgs{
 		Stream: q.stream + "-dead",
-		Values: map[string]any{"task_id": taskID, "error": reason},
+		Values: map[string]any{
+			"task_id": task.ID,
+			"prompt":  task.Prompt,
+			"error":   reason,
+			"attempt": strconv.Itoa(attempt),
+		},
 	}).Err()
 }
 

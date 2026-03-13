@@ -29,6 +29,9 @@ type Config struct {
 	TimeoutSeconds   int
 	TaskQueueURL     string
 	ValidatorPrompt  string
+	// MaxRetries is the number of times a failed task is requeued before dead-lettering.
+	// Set via AGENT_MAX_RETRIES. Defaults to 3.
+	MaxRetries int
 }
 
 // LoadConfig reads agent configuration from environment variables.
@@ -53,6 +56,7 @@ func LoadConfig() (*Config, error) {
 		TaskQueueURL:     queueURL,
 		MaxTokensPerCall: 8000,
 		TimeoutSeconds:   120,
+		MaxRetries:       3,
 		ValidatorPrompt:  os.Getenv("AGENT_VALIDATOR_PROMPT"),
 	}
 
@@ -76,6 +80,14 @@ func LoadConfig() (*Config, error) {
 		if err := json.Unmarshal([]byte(raw), &cfg.MCPServers); err != nil {
 			return nil, fmt.Errorf("invalid AGENT_MCP_SERVERS JSON: %w", err)
 		}
+	}
+
+	if v := os.Getenv("AGENT_MAX_RETRIES"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid AGENT_MAX_RETRIES %q: %w", v, err)
+		}
+		cfg.MaxRetries = n
 	}
 
 	return cfg, nil

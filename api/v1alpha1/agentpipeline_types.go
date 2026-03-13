@@ -59,6 +59,12 @@ type PipelineStep struct {
 
 	// DependsOn lists step names that must complete before this step runs.
 	DependsOn []string `json:"dependsOn,omitempty"`
+
+	// OutputSchema is an optional JSON Schema string that constrains this step's output.
+	// When set, the schema is appended to the agent prompt and the controller validates
+	// that the response parses as JSON before marking the step Succeeded.
+	// Downstream steps can reference structured fields via "{{ .steps.<name>.data.<field> }}".
+	OutputSchema string `json:"outputSchema,omitempty"`
 }
 
 // AgentPipelineSpec defines the desired state of AgentPipeline.
@@ -86,8 +92,13 @@ type PipelineStepStatus struct {
 	// TaskID is the Redis stream message ID of the submitted task, used to
 	// correlate results from the agent-tasks-results stream.
 	TaskID string `json:"taskID,omitempty"`
-	// Output is the agent's response once the step has succeeded.
+	// Output is the agent's raw text response once the step has succeeded.
 	Output string `json:"output,omitempty"`
+
+	// OutputJSON is the agent's response as a JSON string, populated when the step
+	// has an OutputSchema and the response is valid JSON. Downstream steps can
+	// reference fields via "{{ .steps.<name>.data.<field> }}".
+	OutputJSON string `json:"outputJSON,omitempty"`
 	// StartTime is when the step started executing.
 	StartTime *metav1.Time `json:"startTime,omitempty"`
 	// CompletionTime is when the step finished (success or failure).
