@@ -75,13 +75,15 @@ jobs:
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Run Trivy scan
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           trivy image \
             --format sarif \
             --output trivy-operator.sarif \
             --severity CRITICAL,HIGH \
             --exit-code 0 \
-            ${{ env.OPERATOR_IMAGE }}:${{ github.ref_name }}
+            ${{ env.OPERATOR_IMAGE }}:${TAG#v}
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
@@ -110,13 +112,15 @@ jobs:
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Run Trivy scan
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           trivy image \
             --format sarif \
             --output trivy-runtime.sarif \
             --severity CRITICAL,HIGH \
             --exit-code 0 \
-            ${{ env.AGENT_IMAGE }}:${{ github.ref_name }}
+            ${{ env.AGENT_IMAGE }}:${TAG#v}
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
