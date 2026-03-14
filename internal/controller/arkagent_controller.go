@@ -287,6 +287,103 @@ func (r *ArkAgentReconciler) buildDeployment(arkAgent *arkonisv1alpha1.ArkAgent,
 	}
 }
 
+// mergeSystemPrompt prepends/appends ArkSettings prompt fragments around the resolved prompt.
+func mergeSystemPrompt(base string, settings *arkonisv1alpha1.ArkSettings) string {
+	if settings == nil {
+		return base
+	}
+	if settings.Spec.PromptFragments.Persona != "" {
+		base = settings.Spec.PromptFragments.Persona + "\n\n" + base
+	}
+	if settings.Spec.PromptFragments.OutputRules != "" {
+		base = base + "\n\n" + settings.Spec.PromptFragments.OutputRules
+	}
+	return base
+}
+
+// buildSettingsEnvVars returns the env vars derived from an ArkSettings resource.
+func buildSettingsEnvVars(settings *arkonisv1alpha1.ArkSettings) []corev1.EnvVar {
+	if settings == nil {
+		return nil
+	}
+	var envs []corev1.EnvVar
+	if settings.Spec.Temperature != "" {
+		envs = append(envs, corev1.EnvVar{Name: "AGENT_TEMPERATURE", Value: settings.Spec.Temperature})
+	}
+	if settings.Spec.OutputFormat != "" {
+		envs = append(envs, corev1.EnvVar{Name: "AGENT_OUTPUT_FORMAT", Value: settings.Spec.OutputFormat})
+	}
+	if settings.Spec.MemoryBackend != "" {
+		envs = append(envs, corev1.EnvVar{Name: "AGENT_MEMORY_BACKEND", Value: string(settings.Spec.MemoryBackend)})
+	}
+	return envs
+}
+
+// buildRedisMemoryEnvVars returns env vars for a Redis memory backend.
+func buildRedisMemoryEnvVars(mem *arkonisv1alpha1.RedisMemoryConfig) []corev1.EnvVar {
+	if mem == nil {
+		return nil
+	}
+	envs := []corev1.EnvVar{{
+		Name: "AGENT_MEMORY_REDIS_URL",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: mem.SecretRef.Name},
+				Key:                  "REDIS_URL",
+			},
+		},
+	}}
+	if mem.TTLSeconds > 0 {
+		envs = append(envs, corev1.EnvVar{Name: "AGENT_MEMORY_REDIS_TTL", Value: fmt.Sprintf("%d", mem.TTLSeconds)})
+	}
+	if mem.MaxEntries > 0 {
+		envs = append(envs, corev1.EnvVar{Name: "AGENT_MEMORY_REDIS_MAX_ENTRIES", Value: fmt.Sprintf("%d", mem.MaxEntries)})
+	}
+	return envs
+}
+
+// buildVectorStoreMemoryEnvVars returns env vars for a vector-store memory backend.
+func buildVectorStoreMemoryEnvVars(vs *arkonisv1alpha1.VectorStoreMemoryConfig) []corev1.EnvVar {
+	if vs == nil {
+		return nil
+	}
+	envs := []corev1.EnvVar{
+		{Name: "AGENT_MEMORY_VECTOR_STORE_PROVIDER", Value: string(vs.Provider)},
+		{Name: "AGENT_MEMORY_VECTOR_STORE_ENDPOINT", Value: vs.Endpoint},
+		{Name: "AGENT_MEMORY_VECTOR_STORE_COLLECTION", Value: vs.Collection},
+	}
+	if vs.SecretRef != nil {
+		envs = append(envs, corev1.EnvVar{
+			Name: "AGENT_MEMORY_VECTOR_STORE_API_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: vs.SecretRef.Name},
+					Key:                  "VECTOR_STORE_API_KEY",
+				},
+			},
+		})
+	}
+	if vs.TTLSeconds > 0 {
+		envs = append(envs, corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_TTL", Value: fmt.Sprintf("%d", vs.TTLSeconds)})
+	}
+	return envs
+}
+
+// buildMemoryEnvVars returns env vars for the ArkMemory backend (Redis or vector-store).
+func buildMemoryEnvVars(arkMemory *arkonisv1alpha1.ArkMemory) []corev1.EnvVar {
+	if arkMemory == nil {
+		return nil
+	}
+	envs := []corev1.EnvVar{{Name: "AGENT_MEMORY_BACKEND", Value: string(arkMemory.Spec.Backend)}}
+	switch arkMemory.Spec.Backend {
+	case arkonisv1alpha1.MemoryBackendRedis:
+		envs = append(envs, buildRedisMemoryEnvVars(arkMemory.Spec.Redis)...)
+	case arkonisv1alpha1.MemoryBackendVectorStore:
+		envs = append(envs, buildVectorStoreMemoryEnvVars(arkMemory.Spec.VectorStore)...)
+	}
+	return envs
+}
+
 func (r *ArkAgentReconciler) buildEnvVars(
 	arkAgent *arkonisv1alpha1.ArkAgent,
 	arkSettings *arkonisv1alpha1.ArkSettings,
@@ -306,20 +403,9 @@ func (r *ArkAgentReconciler) buildEnvVars(
 		}
 	}
 
-	// Merge ArkSettings prompt fragments into the effective system prompt.
-	systemPrompt := resolvedPrompt
-	if arkSettings != nil {
-		if arkSettings.Spec.PromptFragments.Persona != "" {
-			systemPrompt = arkSettings.Spec.PromptFragments.Persona + "\n\n" + systemPrompt
-		}
-		if arkSettings.Spec.PromptFragments.OutputRules != "" {
-			systemPrompt = systemPrompt + "\n\n" + arkSettings.Spec.PromptFragments.OutputRules
-		}
-	}
-
 	envVars := []corev1.EnvVar{
 		{Name: "AGENT_MODEL", Value: arkAgent.Spec.Model},
-		{Name: "AGENT_SYSTEM_PROMPT", Value: systemPrompt},
+		{Name: "AGENT_SYSTEM_PROMPT", Value: mergeSystemPrompt(resolvedPrompt, arkSettings)},
 		{Name: "AGENT_MCP_SERVERS", Value: string(mcpJSON)},
 		{Name: "AGENT_MAX_TOKENS", Value: fmt.Sprintf("%d", maxTokens)},
 		{Name: "AGENT_TIMEOUT_SECONDS", Value: fmt.Sprintf("%d", timeoutSecs)},
@@ -342,79 +428,9 @@ func (r *ArkAgentReconciler) buildEnvVars(
 		})
 	}
 
-	// Propagate optional ArkSettings settings as env vars for the runtime.
-	if arkSettings != nil {
-		if arkSettings.Spec.Temperature != "" {
-			envVars = append(envVars, corev1.EnvVar{Name: "AGENT_TEMPERATURE", Value: arkSettings.Spec.Temperature})
-		}
-		if arkSettings.Spec.OutputFormat != "" {
-			envVars = append(envVars, corev1.EnvVar{Name: "AGENT_OUTPUT_FORMAT", Value: arkSettings.Spec.OutputFormat})
-		}
-		if arkSettings.Spec.MemoryBackend != "" {
-			envVars = append(envVars, corev1.EnvVar{Name: "AGENT_MEMORY_BACKEND", Value: string(arkSettings.Spec.MemoryBackend)})
-		}
-	}
-
-	// Propagate ArkMemory config as env vars. ArkMemory takes precedence over
-	// any AGENT_MEMORY_BACKEND set via ArkSettings.
-	if arkMemory != nil {
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "AGENT_MEMORY_BACKEND",
-			Value: string(arkMemory.Spec.Backend),
-		})
-		switch arkMemory.Spec.Backend {
-		case arkonisv1alpha1.MemoryBackendRedis:
-			if arkMemory.Spec.Redis != nil {
-				// Inject Redis URL from the referenced Secret.
-				envVars = append(envVars, corev1.EnvVar{
-					Name: "AGENT_MEMORY_REDIS_URL",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: arkMemory.Spec.Redis.SecretRef.Name},
-							Key:                  "REDIS_URL",
-						},
-					},
-				})
-				if arkMemory.Spec.Redis.TTLSeconds > 0 {
-					envVars = append(envVars, corev1.EnvVar{
-						Name:  "AGENT_MEMORY_REDIS_TTL",
-						Value: fmt.Sprintf("%d", arkMemory.Spec.Redis.TTLSeconds),
-					})
-				}
-				if arkMemory.Spec.Redis.MaxEntries > 0 {
-					envVars = append(envVars, corev1.EnvVar{
-						Name:  "AGENT_MEMORY_REDIS_MAX_ENTRIES",
-						Value: fmt.Sprintf("%d", arkMemory.Spec.Redis.MaxEntries),
-					})
-				}
-			}
-		case arkonisv1alpha1.MemoryBackendVectorStore:
-			if arkMemory.Spec.VectorStore != nil {
-				envVars = append(envVars,
-					corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_PROVIDER", Value: string(arkMemory.Spec.VectorStore.Provider)},
-					corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_ENDPOINT", Value: arkMemory.Spec.VectorStore.Endpoint},
-					corev1.EnvVar{Name: "AGENT_MEMORY_VECTOR_STORE_COLLECTION", Value: arkMemory.Spec.VectorStore.Collection},
-				)
-				if arkMemory.Spec.VectorStore.SecretRef != nil {
-					envVars = append(envVars, corev1.EnvVar{
-						Name: "AGENT_MEMORY_VECTOR_STORE_API_KEY",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: arkMemory.Spec.VectorStore.SecretRef.Name},
-								Key:                  "VECTOR_STORE_API_KEY",
-							},
-						},
-					})
-				}
-				if arkMemory.Spec.VectorStore.TTLSeconds > 0 {
-					envVars = append(envVars, corev1.EnvVar{
-						Name:  "AGENT_MEMORY_VECTOR_STORE_TTL",
-						Value: fmt.Sprintf("%d", arkMemory.Spec.VectorStore.TTLSeconds),
-					})
-				}
-			}
-		}
-	}
+	envVars = append(envVars, buildSettingsEnvVars(arkSettings)...)
+	// ArkMemory takes precedence over any AGENT_MEMORY_BACKEND set via ArkSettings.
+	envVars = append(envVars, buildMemoryEnvVars(arkMemory)...)
 
 	// Inject inline webhook tool definitions so the agent runtime can call them directly.
 	if len(arkAgent.Spec.Tools) > 0 {

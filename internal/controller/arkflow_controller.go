@@ -98,8 +98,7 @@ func (r *ArkFlowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Terminal phases — nothing to do.
-	if flow.Status.Phase == arkonisv1alpha1.ArkFlowPhaseSucceeded ||
-		flow.Status.Phase == arkonisv1alpha1.ArkFlowPhaseFailed {
+	if isTerminalPhase(flow.Status.Phase) {
 		flow.Status.ObservedGeneration = flow.Generation
 		return ctrl.Result{}, r.Status().Update(ctx, flow)
 	}
@@ -116,11 +115,7 @@ func (r *ArkFlowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	r.initializeSteps(flow)
 
-	// Build lookup maps for convenient access.
-	statusByName := make(map[string]*arkonisv1alpha1.ArkFlowStepStatus, len(flow.Status.Steps))
-	for i := range flow.Status.Steps {
-		statusByName[flow.Status.Steps[i].Name] = &flow.Status.Steps[i]
-	}
+	statusByName := buildStatusByName(flow)
 
 	// Check results for in-flight steps.
 	if err := r.collectResults(ctx, rdb, flow, statusByName); err != nil {
@@ -150,6 +145,20 @@ func (r *ArkFlowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{RequeueAfter: pipelineRequeueIn}, nil
 	}
 	return ctrl.Result{}, nil
+}
+
+// isTerminalPhase reports whether the flow has reached a final state.
+func isTerminalPhase(phase arkonisv1alpha1.ArkFlowPhase) bool {
+	return phase == arkonisv1alpha1.ArkFlowPhaseSucceeded || phase == arkonisv1alpha1.ArkFlowPhaseFailed
+}
+
+// buildStatusByName returns a name→status pointer map for convenient step lookups.
+func buildStatusByName(flow *arkonisv1alpha1.ArkFlow) map[string]*arkonisv1alpha1.ArkFlowStepStatus {
+	m := make(map[string]*arkonisv1alpha1.ArkFlowStepStatus, len(flow.Status.Steps))
+	for i := range flow.Status.Steps {
+		m[flow.Status.Steps[i].Name] = &flow.Status.Steps[i]
+	}
+	return m
 }
 
 // initializeSteps sets up step statuses and marks the flow Running on the first reconcile.
@@ -300,26 +309,25 @@ func (r *ArkFlowReconciler) submitPendingSteps(
 	return nil
 }
 
-// updateFlowPhase inspects step statuses and transitions the flow to Succeeded or Failed.
-func (r *ArkFlowReconciler) updateFlowPhase(
-	flow *arkonisv1alpha1.ArkFlow,
-	templateData map[string]any,
-) {
-	now := metav1.Now()
-
-	// Enforce flow-level timeout before inspecting step phases.
-	if flow.Spec.TimeoutSeconds > 0 && flow.Status.StartTime != nil {
-		deadline := flow.Status.StartTime.Add(time.Duration(flow.Spec.TimeoutSeconds) * time.Second)
-		if now.After(deadline) {
-			flow.Status.Phase = arkonisv1alpha1.ArkFlowPhaseFailed
-			flow.Status.CompletionTime = &now
-			r.setCondition(flow, metav1.ConditionFalse, "TimedOut",
-				fmt.Sprintf("flow exceeded timeout of %ds", flow.Spec.TimeoutSeconds))
-			return
-		}
+// enforceTimeout sets the flow to Failed if the timeout has elapsed. Returns true if timed out.
+func (r *ArkFlowReconciler) enforceTimeout(flow *arkonisv1alpha1.ArkFlow, now metav1.Time) bool {
+	if flow.Spec.TimeoutSeconds <= 0 || flow.Status.StartTime == nil {
+		return false
 	}
+	deadline := flow.Status.StartTime.Add(time.Duration(flow.Spec.TimeoutSeconds) * time.Second)
+	if !now.After(deadline) {
+		return false
+	}
+	flow.Status.Phase = arkonisv1alpha1.ArkFlowPhaseFailed
+	flow.Status.CompletionTime = &now
+	r.setCondition(flow, metav1.ConditionFalse, "TimedOut",
+		fmt.Sprintf("flow exceeded timeout of %ds", flow.Spec.TimeoutSeconds))
+	return true
+}
 
-	// Sum token usage across all steps and update the flow total.
+// sumStepTokens accumulates input/output token counts across all completed steps
+// and updates flow.Status.TotalTokenUsage. Returns the grand total.
+func sumStepTokens(flow *arkonisv1alpha1.ArkFlow) int64 {
 	var totalIn, totalOut int64
 	for _, st := range flow.Status.Steps {
 		if st.TokenUsage != nil {
@@ -334,13 +342,28 @@ func (r *ArkFlowReconciler) updateFlowPhase(
 			TotalTokens:  totalIn + totalOut,
 		}
 	}
+	return totalIn + totalOut
+}
+
+// updateFlowPhase inspects step statuses and transitions the flow to Succeeded or Failed.
+func (r *ArkFlowReconciler) updateFlowPhase(
+	flow *arkonisv1alpha1.ArkFlow,
+	templateData map[string]any,
+) {
+	now := metav1.Now()
+
+	if r.enforceTimeout(flow, now) {
+		return
+	}
+
+	totalTokens := sumStepTokens(flow)
 
 	// Enforce token budget.
-	if flow.Spec.MaxTokens > 0 && totalIn+totalOut > flow.Spec.MaxTokens {
+	if flow.Spec.MaxTokens > 0 && totalTokens > flow.Spec.MaxTokens {
 		flow.Status.Phase = arkonisv1alpha1.ArkFlowPhaseFailed
 		flow.Status.CompletionTime = &now
 		r.setCondition(flow, metav1.ConditionFalse, "BudgetExceeded",
-			fmt.Sprintf("token budget of %d exceeded: used %d", flow.Spec.MaxTokens, totalIn+totalOut))
+			fmt.Sprintf("token budget of %d exceeded: used %d", flow.Spec.MaxTokens, totalTokens))
 		return
 	}
 
