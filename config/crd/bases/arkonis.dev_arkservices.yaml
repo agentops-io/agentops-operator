@@ -32,8 +32,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ArkService routes incoming tasks to a pool of ArkAgent
-          replicas.
+        description: ArkService routes incoming tasks to a pool of ArkAgent replicas.
         properties:
           apiVersion:
             description: |-
