@@ -29,7 +29,7 @@ import (
 //
 //	POST /triggers/{namespace}/{name}/fire?mode=sync
 //	POST /triggers/{namespace}/{name}/fire?mode=sync&timeout=30s
-//	→ 200 OK        { "status": "succeeded", "output": "...", "durationMs": N }
+//	→ 200 OK        { "status": "succeeded", "output": "...", "durationMs": N, "tokenUsage": { "inputTokens": N, "outputTokens": N, "totalTokens": N } }
 //	→ 500           { "status": "failed",    "error":  "..." }
 //	→ 504           { "error": "timed out" }
 //
@@ -199,10 +199,11 @@ func (s *TriggerWebhookServer) handleSync(w http.ResponseWriter, r *http.Request
 
 // syncResult is the response body for sync mode.
 type syncResult struct {
-	Status     string `json:"status"`
-	Output     string `json:"output,omitempty"`
-	Error      string `json:"error,omitempty"`
-	DurationMs int64  `json:"durationMs"`
+	Status     string                      `json:"status"`
+	Output     string                      `json:"output,omitempty"`
+	Error      string                      `json:"error,omitempty"`
+	DurationMs int64                       `json:"durationMs"`
+	TokenUsage *arkonisv1alpha1.TokenUsage `json:"tokenUsage,omitempty"`
 }
 
 // waitForFlow polls the flow until it reaches a terminal phase or ctx is cancelled.
@@ -222,7 +223,7 @@ func (s *TriggerWebhookServer) waitForFlow(ctx context.Context, flow *arkonisv1a
 			}
 			switch f.Status.Phase {
 			case arkonisv1alpha1.ArkFlowPhaseSucceeded:
-				return &syncResult{Status: "succeeded", Output: f.Status.Output}, nil
+				return &syncResult{Status: "succeeded", Output: f.Status.Output, TokenUsage: f.Status.TotalTokenUsage}, nil
 			case arkonisv1alpha1.ArkFlowPhaseFailed:
 				msg := "flow failed"
 				for _, c := range f.Status.Conditions {
