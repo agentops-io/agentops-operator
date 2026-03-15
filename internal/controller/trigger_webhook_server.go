@@ -33,7 +33,23 @@ import (
 //	→ 500           { "status": "failed",    "error":  "..." }
 //	→ 504           { "error": "timed out" }
 //
-// Sync mode requires exactly one target flow. The default timeout is 60s; maximum is 5m.
+// SSE mode — streams progress events as the flow runs:
+//
+//	POST /triggers/{namespace}/{name}/fire?mode=sse
+//	POST /triggers/{namespace}/{name}/fire?mode=sse&timeout=5m
+//	→ text/event-stream
+//	  event: step.started
+//	  data: {"step":"<name>","phase":"Running"}
+//	  event: step.completed
+//	  data: {"step":"<name>","output":"...","tokenUsage":{...},"durationMs":N}
+//	  event: flow.completed
+//	  data: {"status":"succeeded","output":"...","tokenUsage":{...},"durationMs":N}
+//	  event: flow.failed
+//	  data: {"status":"failed","error":"...","durationMs":N}
+//	  event: error
+//	  data: {"error":"timed out"}
+//
+// Sync and SSE modes require exactly one target flow. The default timeout is 60s; maximum is 5m.
 //
 // Authentication: pass the trigger's token as a Bearer token in the Authorization
 // header or as the `token` query parameter. The token is stored in a Secret named
@@ -117,8 +133,8 @@ func (s *TriggerWebhookServer) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		Body:    body,
 	}
 
-	// Determine sync vs async mode.
-	syncMode := r.URL.Query().Get("mode") == "sync"
+	// Determine mode: async (default), sync, or sse.
+	mode := r.URL.Query().Get("mode")
 
 	flows, err := s.reconciler.fire(ctx, trigger, fireCtx)
 	if err != nil {
@@ -135,8 +151,12 @@ func (s *TriggerWebhookServer) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		logger.Error(err, "updating trigger status after webhook fire")
 	}
 
-	if syncMode {
+	switch mode {
+	case "sync":
 		s.handleSync(w, r, flows)
+		return
+	case "sse":
+		s.handleSSE(w, r, flows)
 		return
 	}
 
@@ -197,6 +217,128 @@ func (s *TriggerWebhookServer) handleSync(w http.ResponseWriter, r *http.Request
 	_ = json.NewEncoder(w).Encode(result)
 }
 
+// handleSSE streams Server-Sent Events as the flow progresses.
+func (s *TriggerWebhookServer) handleSSE(w http.ResponseWriter, r *http.Request, flows []*arkonisv1alpha1.ArkFlow) {
+	if len(flows) != 1 {
+		http.Error(w, "sse mode requires exactly one target flow", http.StatusBadRequest)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	timeout := defaultSyncTimeout
+	if raw := r.URL.Query().Get("timeout"); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil {
+			timeout = d
+		}
+	}
+	if timeout > maxSyncTimeout {
+		timeout = maxSyncTimeout
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	sseCtx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	key := types.NamespacedName{Name: flows[0].Name, Namespace: flows[0].Namespace}
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	start := time.Now()
+	// stepPhases tracks the last seen phase per step to detect transitions.
+	stepPhases := map[string]arkonisv1alpha1.ArkFlowStepPhase{}
+
+	for {
+		select {
+		case <-sseCtx.Done():
+			sseEvent(w, flusher, "error", map[string]any{"error": fmt.Sprintf("timed out after %s", timeout)})
+			return
+		case <-ticker.C:
+			f := &arkonisv1alpha1.ArkFlow{}
+			if err := s.reconciler.Get(sseCtx, key, f); err != nil {
+				sseEvent(w, flusher, "error", map[string]any{"error": err.Error()})
+				return
+			}
+
+			// Emit events for step phase transitions.
+			for _, step := range f.Status.Steps {
+				prev := stepPhases[step.Name]
+				if prev == step.Phase {
+					continue
+				}
+				stepPhases[step.Name] = step.Phase
+
+				switch step.Phase {
+				case arkonisv1alpha1.ArkFlowStepPhaseRunning:
+					sseEvent(w, flusher, "step.started", map[string]any{
+						"step":  step.Name,
+						"phase": "Running",
+					})
+				case arkonisv1alpha1.ArkFlowStepPhaseSucceeded:
+					payload := map[string]any{
+						"step":       step.Name,
+						"output":     step.Output,
+						"durationMs": step.CompletionTime.Sub(step.StartTime.Time).Milliseconds(),
+					}
+					if step.TokenUsage != nil {
+						payload["tokenUsage"] = step.TokenUsage
+					}
+					sseEvent(w, flusher, "step.completed", payload)
+				case arkonisv1alpha1.ArkFlowStepPhaseFailed:
+					sseEvent(w, flusher, "step.failed", map[string]any{
+						"step": step.Name,
+					})
+				}
+			}
+
+			// Emit terminal flow events.
+			switch f.Status.Phase {
+			case arkonisv1alpha1.ArkFlowPhaseSucceeded:
+				payload := map[string]any{
+					"status":     "succeeded",
+					"output":     f.Status.Output,
+					"durationMs": time.Since(start).Milliseconds(),
+				}
+				if f.Status.TotalTokenUsage != nil {
+					payload["tokenUsage"] = f.Status.TotalTokenUsage
+				}
+				sseEvent(w, flusher, "flow.completed", payload)
+				return
+			case arkonisv1alpha1.ArkFlowPhaseFailed:
+				msg := "flow failed"
+				for _, c := range f.Status.Conditions {
+					if c.Type == arkonisv1alpha1.ConditionReady && c.Status == metav1.ConditionFalse {
+						msg = c.Message
+						break
+					}
+				}
+				sseEvent(w, flusher, "flow.failed", map[string]any{
+					"status":     "failed",
+					"error":      msg,
+					"durationMs": time.Since(start).Milliseconds(),
+				})
+				return
+			}
+		}
+	}
+}
+
+// sseEvent writes a single SSE event and flushes the connection.
+func sseEvent(w http.ResponseWriter, flusher http.Flusher, event string, data any) {
+	b, _ := json.Marshal(data)
+	_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, b)
+	flusher.Flush()
+}
+
 // syncResult is the response body for sync mode.
 type syncResult struct {
 	Status     string                      `json:"status"`
@@ -227,7 +369,7 @@ func (s *TriggerWebhookServer) waitForFlow(ctx context.Context, flow *arkonisv1a
 			case arkonisv1alpha1.ArkFlowPhaseFailed:
 				msg := "flow failed"
 				for _, c := range f.Status.Conditions {
-					if c.Type == "Ready" && c.Status == metav1.ConditionFalse {
+					if c.Type == arkonisv1alpha1.ConditionReady && c.Status == metav1.ConditionFalse {
 						msg = c.Message
 						break
 					}

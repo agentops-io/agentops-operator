@@ -118,7 +118,7 @@ func (r *ArkAgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	resolvedPrompt, err := r.resolveSystemPrompt(ctx, arkAgent)
 	if err != nil {
 		logger.Error(err, "failed to resolve systemPrompt")
-		r.setCondition(arkAgent, "Ready", metav1.ConditionFalse, "PromptResolutionError", err.Error())
+		r.setCondition(arkAgent, arkonisv1alpha1.ConditionReady, metav1.ConditionFalse, "PromptResolutionError", err.Error())
 		_ = r.Status().Update(ctx, arkAgent)
 		return ctrl.Result{}, err
 	}
@@ -132,7 +132,7 @@ func (r *ArkAgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// 5. Reconcile the owned k8s Deployment (budget check may override replicas to 0).
 	if err := r.reconcileDeployment(ctx, arkAgent, arkSettings, arkMemory, resolvedPrompt); err != nil {
 		logger.Error(err, "failed to reconcile Deployment")
-		r.setCondition(arkAgent, "Ready", metav1.ConditionFalse, "ReconcileError", err.Error())
+		r.setCondition(arkAgent, arkonisv1alpha1.ConditionReady, metav1.ConditionFalse, "ReconcileError", err.Error())
 		_ = r.Status().Update(ctx, arkAgent)
 		return ctrl.Result{}, err
 	}
@@ -200,7 +200,7 @@ func (r *ArkAgentReconciler) syncStatus(
 		condStatus = metav1.ConditionTrue
 		condReason = "AllReplicasReady"
 	}
-	r.setCondition(arkAgent, "Ready", condStatus, condReason, condMsg)
+	r.setCondition(arkAgent, arkonisv1alpha1.ConditionReady, condStatus, condReason, condMsg)
 
 	return r.Status().Update(ctx, arkAgent)
 }

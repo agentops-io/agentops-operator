@@ -172,7 +172,7 @@ func (r *ArkEventReconciler) reconcileWebhook(ctx context.Context, trigger *arko
 		trigger.Status.WebhookURL = fmt.Sprintf("%s/triggers/%s/%s/fire",
 			r.TriggerWebhookURL, trigger.Namespace, trigger.Name)
 	}
-	r.setCondition(trigger, metav1.ConditionTrue, "Ready", "waiting for webhook POST")
+	r.setCondition(trigger, metav1.ConditionTrue, arkonisv1alpha1.ConditionReady, "waiting for webhook POST")
 	return nil
 }
 
@@ -409,7 +409,7 @@ func (r *ArkEventReconciler) setCondition(
 	reason, message string,
 ) {
 	now := metav1.Now()
-	condType := "Ready"
+	condType := arkonisv1alpha1.ConditionReady
 	for i, c := range trigger.Status.Conditions {
 		if c.Type == condType {
 			trigger.Status.Conditions[i].Status = status

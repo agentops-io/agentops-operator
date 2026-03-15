@@ -57,7 +57,7 @@ func (r *ArkSettingsReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	arkSettings.Status.ObservedGeneration = arkSettings.Generation
 	apimeta.SetStatusCondition(&arkSettings.Status.Conditions, metav1.Condition{
-		Type:               "Ready",
+		Type:               arkonisv1alpha1.ConditionReady,
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: arkSettings.Generation,
 		Reason:             "Accepted",

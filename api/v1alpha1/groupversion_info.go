@@ -24,6 +24,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
+// ConditionReady is the standard condition type used across all Ark resources.
+const ConditionReady = "Ready"
+
 var (
 	// GroupVersion is group version used to register these objects.
 	GroupVersion = schema.GroupVersion{Group: "arkonis.dev", Version: "v1alpha1"}

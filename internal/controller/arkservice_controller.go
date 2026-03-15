@@ -174,7 +174,7 @@ func (r *ArkServiceReconciler) setCondition(
 	reason, message string,
 ) {
 	apimeta.SetStatusCondition(&arkonisSvc.Status.Conditions, metav1.Condition{
-		Type:               "Ready",
+		Type:               arkonisv1alpha1.ConditionReady,
 		Status:             status,
 		ObservedGeneration: arkonisSvc.Generation,
 		Reason:             reason,

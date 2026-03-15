@@ -59,7 +59,7 @@ func (r *ArkMemoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.validate(arkMemory); err != nil {
 		arkMemory.Status.ObservedGeneration = arkMemory.Generation
 		apimeta.SetStatusCondition(&arkMemory.Status.Conditions, metav1.Condition{
-			Type:               "Ready",
+			Type:               arkonisv1alpha1.ConditionReady,
 			Status:             metav1.ConditionFalse,
 			ObservedGeneration: arkMemory.Generation,
 			Reason:             "InvalidSpec",
@@ -70,7 +70,7 @@ func (r *ArkMemoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	arkMemory.Status.ObservedGeneration = arkMemory.Generation
 	apimeta.SetStatusCondition(&arkMemory.Status.Conditions, metav1.Condition{
-		Type:               "Ready",
+		Type:               arkonisv1alpha1.ConditionReady,
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: arkMemory.Generation,
 		Reason:             "Accepted",
