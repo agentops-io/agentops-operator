@@ -1,0 +1,56 @@
+# quickstart.yaml — run this with:
+#
+#   ark run quickstart.yaml --provider mock --watch
+#   ark run quickstart.yaml --watch                   (requires ANTHROPIC_API_KEY)
+#   ark run quickstart.yaml --provider openai --watch (requires OPENAI_API_KEY)
+#
+# Pass a different topic:
+#   ark run quickstart.yaml --input '{"topic":"Kubernetes operators"}' --watch
+#
+# The flow has two steps:
+#   1. researcher  — gathers information on the topic
+#   2. summarizer  — distils the findings into bullet points
+#
+# Step 2 only starts after step 1 completes, and receives its output as input.
+---
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkAgent
+metadata:
+  name: researcher
+spec:
+  model: claude-sonnet-4-20250514
+  systemPrompt: |
+    You are a research agent. Your job is to gather accurate, well-cited
+    information on the topic you are given. Be concise and factual.
+---
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkAgent
+metadata:
+  name: summarizer
+spec:
+  model: claude-sonnet-4-20250514
+  systemPrompt: |
+    You are a summarization agent. Given research findings, produce a clear
+    summary as 3–5 bullet points. Be concise.
+---
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkFlow
+metadata:
+  name: research-and-summarize
+spec:
+  input:
+    topic: "large language models"
+
+  steps:
+    - name: research
+      arkAgent: researcher
+      inputs:
+        prompt: "Research this topic and share your findings: {{ .pipeline.input.topic }}"
+
+    - name: summarize
+      arkAgent: summarizer
+      dependsOn: [research]
+      inputs:
+        prompt: "Summarize the following research in 3–5 bullet points:\n\n{{ .steps.research.output }}"
+
+  output: "{{ .steps.summarize.output }}"

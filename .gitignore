@@ -32,5 +32,6 @@ go.work
 # Build artifacts
 dist/
 
-# Compiled agent binary (built via Dockerfile.agent)
+# Compiled binaries
 /agent
+/ark
