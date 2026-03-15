@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/mcp"
+	"github.com/arkonis-dev/ark-operator/internal/agent/config"
+	"github.com/arkonis-dev/ark-operator/internal/agent/mcp"
 )
 
 func mcpToolsListHandler(tools []map[string]any) http.HandlerFunc {

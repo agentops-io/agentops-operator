@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
+	"github.com/arkonis-dev/ark-operator/internal/agent/config"
 )
 
 const contentTypeText = "text"

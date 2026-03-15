@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/queue"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/runner"
+	"github.com/arkonis-dev/ark-operator/internal/agent/queue"
+	"github.com/arkonis-dev/ark-operator/internal/agent/runner"
 )
 
 // ServeProbe starts HTTP health endpoints on addr.

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
+	"github.com/arkonis-dev/ark-operator/internal/agent/config"
 )
 
 func setEnv(t *testing.T, key, value string) {

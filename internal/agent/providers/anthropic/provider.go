@@ -12,10 +12,10 @@ import (
 	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/mcp"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/providers"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/queue"
+	"github.com/arkonis-dev/ark-operator/internal/agent/config"
+	"github.com/arkonis-dev/ark-operator/internal/agent/mcp"
+	"github.com/arkonis-dev/ark-operator/internal/agent/providers"
+	"github.com/arkonis-dev/ark-operator/internal/agent/queue"
 )
 
 func init() {

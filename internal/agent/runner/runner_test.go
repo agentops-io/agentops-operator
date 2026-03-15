@@ -6,10 +6,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/mcp"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/queue"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/runner"
+	"github.com/arkonis-dev/ark-operator/internal/agent/config"
+	"github.com/arkonis-dev/ark-operator/internal/agent/mcp"
+	"github.com/arkonis-dev/ark-operator/internal/agent/queue"
+	"github.com/arkonis-dev/ark-operator/internal/agent/runner"
 )
 
 type mockProvider struct {

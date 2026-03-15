@@ -11,11 +11,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/mcp"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/queue"
+	"github.com/arkonis-dev/ark-operator/internal/agent/config"
+	"github.com/arkonis-dev/ark-operator/internal/agent/mcp"
+	"github.com/arkonis-dev/ark-operator/internal/agent/queue"
 )
 
 // LLMProvider is the interface every LLM backend must implement.
@@ -32,6 +33,8 @@ type LLMProvider interface {
 		callTool func(context.Context, string, json.RawMessage) (string, error),
 	) (string, queue.TokenUsage, error)
 }
+
+const defaultProvider = "anthropic"
 
 var (
 	mu       sync.RWMutex
@@ -50,7 +53,7 @@ func Register(name string, factory func() LLMProvider) {
 // An empty name defaults to "anthropic".
 func New(name string) (LLMProvider, error) {
 	if name == "" {
-		name = "anthropic"
+		name = defaultProvider
 	}
 	mu.RLock()
 	factory, ok := registry[name]
@@ -59,4 +62,25 @@ func New(name string) (LLMProvider, error) {
 		return nil, fmt.Errorf("unsupported provider %q; import its package to register it", name)
 	}
 	return factory(), nil
+}
+
+// Detect returns the provider name for a given model ID.
+// It inspects the model string prefix to infer the backend:
+//
+//	claude-*          → anthropic
+//	gpt-*, o1*, o3*, o4* → openai
+//
+// Falls back to "anthropic" for unrecognised models.
+func Detect(model string) string {
+	switch {
+	case strings.HasPrefix(model, "claude-"):
+		return defaultProvider
+	case strings.HasPrefix(model, "gpt-"),
+		strings.HasPrefix(model, "o1"),
+		strings.HasPrefix(model, "o3"),
+		strings.HasPrefix(model, "o4"):
+		return "openai"
+	default:
+		return "anthropic"
+	}
 }

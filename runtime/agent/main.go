@@ -7,16 +7,16 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/health"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/mcp"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/providers"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/queue"
-	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/runner"
+	"github.com/arkonis-dev/ark-operator/internal/agent/config"
+	"github.com/arkonis-dev/ark-operator/internal/agent/health"
+	"github.com/arkonis-dev/ark-operator/internal/agent/mcp"
+	"github.com/arkonis-dev/ark-operator/internal/agent/providers"
+	"github.com/arkonis-dev/ark-operator/internal/agent/queue"
+	"github.com/arkonis-dev/ark-operator/internal/agent/runner"
 
 	// Register LLM provider implementations via their init() functions.
-	_ "github.com/arkonis-dev/ark-operator/runtime/agent/internal/providers/anthropic"
-	_ "github.com/arkonis-dev/ark-operator/runtime/agent/internal/providers/openai"
+	_ "github.com/arkonis-dev/ark-operator/internal/agent/providers/anthropic"
+	_ "github.com/arkonis-dev/ark-operator/internal/agent/providers/openai"
 )
 
 func main() {
