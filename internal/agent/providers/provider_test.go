@@ -41,7 +41,9 @@ func TestDetect(t *testing.T) {
 		{"o1-preview", "openai"},
 		{"o3-mini", "openai"},
 		{"o4-mini", "openai"},
-		{"unknown-model-xyz", "anthropic"}, // safe default
+		{"unknown-model-xyz", "openai"}, // default: OpenAI-compatible (e.g. Ollama)
+		{"qwen2.5:1.5b", "openai"},
+		{"llama3.2", "openai"},
 	}
 	for _, tc := range cases {
 		if got := providers.Detect(tc.model); got != tc.want {
