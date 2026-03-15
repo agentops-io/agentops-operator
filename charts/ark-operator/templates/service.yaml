@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ark-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ark-operator.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "ark-operator.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: webhook
+    port: {{ .Values.service.port }}
+    targetPort: webhook
+    protocol: TCP

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: ark-operator
+description: Kubernetes operator for running AI agents in production.
+type: application
+version: 0.1.0
+appVersion: "v0.5.3"
+keywords:
+  - ai
+  - agents
+  - llm
+  - kubernetes
+  - operator
+home: https://arkonis.dev
+sources:
+  - https://github.com/arkonis-dev/ark-operator
+maintainers:
+  - name: arkonis-dev
+    url: https://github.com/arkonis-dev

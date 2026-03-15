@@ -1,0 +1,359 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: arkflows.arkonis.dev
+spec:
+  group: arkonis.dev
+  names:
+    kind: ArkFlow
+    listKind: ArkFlowList
+    plural: arkflows
+    singular: arkflow
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.totalTokenUsage.inputTokens
+      name: In
+      type: integer
+    - jsonPath: .status.totalTokenUsage.outputTokens
+      name: Out
+      type: integer
+    - jsonPath: .status.totalTokenUsage.totalTokens
+      name: Tokens
+      type: integer
+    - jsonPath: .status.startTime
+      name: Started
+      type: date
+    - jsonPath: .status.completionTime
+      name: Completed
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ArkFlow defines a DAG of agent steps where outputs feed into
+          inputs.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ArkFlowSpec defines the desired state of ArkFlow.
+            properties:
+              input:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Input is the initial data passed into the pipeline. Step inputs can
+                  reference these values via "{{ .pipeline.input.<key> }}".
+                type: object
+              maxTokens:
+                description: |-
+                  MaxTokens is the total token budget (input + output) for the entire pipeline run.
+                  The pipeline is failed with reason BudgetExceeded if this limit is reached.
+                  Zero means no limit.
+                format: int64
+                minimum: 1
+                type: integer
+              output:
+                description: |-
+                  Output is a Go template expression that selects the final pipeline result.
+                  Example: "{{ .steps.summarize.output }}"
+                type: string
+              steps:
+                description: Steps is the ordered (DAG) list of pipeline nodes.
+                items:
+                  description: ArkFlowStep defines one node in the agent DAG.
+                  properties:
+                    arkAgent:
+                      description: ArkAgent is the name of the ArkAgent that executes
+                        this step.
+                      type: string
+                    dependsOn:
+                      description: DependsOn lists step names that must complete before
+                        this step runs.
+                      items:
+                        type: string
+                      type: array
+                    if:
+                      description: |-
+                        If is an optional Go template expression. When set, the step only executes if the
+                        expression evaluates to a truthy value. A falsy result marks the step Skipped, which
+                        counts as satisfied for downstream dependency checks.
+                        Example: "{{ .steps.check.data.shouldContinue }}"
+                      type: string
+                    inputs:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Inputs is a map of input key → Go template expression referencing pipeline
+                        inputs or earlier step outputs. Example: "{{ .steps.research.output }}"
+                      type: object
+                    loop:
+                      description: |-
+                        Loop makes this step repeat until Condition evaluates to false or MaxIterations is reached.
+                        Each successful iteration resets the step to Pending so it can be re-submitted.
+                      properties:
+                        condition:
+                          description: |-
+                            Condition is a Go template expression evaluated after each iteration.
+                            The step repeats while this evaluates to a truthy value ("true", non-empty, non-"false", non-"0").
+                            Example: "{{ gt (len .steps.collect.output) 0 }}"
+                          type: string
+                        maxIterations:
+                          default: 10
+                          description: MaxIterations caps the number of loop repetitions
+                            to prevent infinite loops.
+                          maximum: 100
+                          minimum: 1
+                          type: integer
+                      required:
+                      - condition
+                      type: object
+                    name:
+                      description: Name is the unique identifier for this step within
+                        the pipeline.
+                      minLength: 1
+                      type: string
+                    outputSchema:
+                      description: |-
+                        OutputSchema is an optional JSON Schema string that constrains this step's output.
+                        When set, the schema is appended to the agent prompt and the controller validates
+                        that the response parses as JSON before marking the step Succeeded.
+                        Downstream steps can reference structured fields via "{{ .steps.<name>.data.<field> }}".
+                      type: string
+                  required:
+                  - arkAgent
+                  - name
+                  type: object
+                minItems: 1
+                type: array
+              timeoutSeconds:
+                description: |-
+                  TimeoutSeconds is the maximum wall-clock seconds the pipeline may run before being
+                  failed with reason TimedOut. Zero means no timeout.
+                minimum: 1
+                type: integer
+            required:
+            - steps
+            type: object
+          status:
+            description: ArkFlowStatus defines the observed state of ArkFlow.
+            properties:
+              completionTime:
+                description: CompletionTime is when the pipeline finished.
+                format: date-time
+                type: string
+              conditions:
+                description: Conditions reflect the current state of the ArkFlow.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: ObservedGeneration is the .metadata.generation this status
+                  reflects.
+                format: int64
+                type: integer
+              output:
+                description: Output is the resolved final pipeline output once phase
+                  is Succeeded.
+                type: string
+              phase:
+                description: Phase is the overall pipeline execution state.
+                enum:
+                - Pending
+                - Running
+                - Succeeded
+                - Failed
+                type: string
+              startTime:
+                description: StartTime is when the pipeline started.
+                format: date-time
+                type: string
+              steps:
+                description: Steps holds per-step status.
+                items:
+                  description: ArkFlowStepStatus captures the observed state of a
+                    single step.
+                  properties:
+                    completionTime:
+                      description: CompletionTime is when the step finished (success
+                        or failure).
+                      format: date-time
+                      type: string
+                    iterations:
+                      description: Iterations is the number of times this step has
+                        been executed (for loop steps).
+                      type: integer
+                    message:
+                      description: Message holds a human-readable status detail.
+                      type: string
+                    name:
+                      description: Name matches the step name in spec.
+                      type: string
+                    output:
+                      description: Output is the agent's raw text response once the
+                        step has succeeded.
+                      type: string
+                    outputJSON:
+                      description: |-
+                        OutputJSON is the agent's response as a JSON string, populated when the step
+                        has an OutputSchema and the response is valid JSON. Downstream steps can
+                        reference fields via "{{ .steps.<name>.data.<field> }}".
+                      type: string
+                    phase:
+                      description: Phase is the current execution phase.
+                      enum:
+                      - Pending
+                      - Running
+                      - Succeeded
+                      - Failed
+                      - Skipped
+                      type: string
+                    startTime:
+                      description: StartTime is when the step started executing.
+                      format: date-time
+                      type: string
+                    taskID:
+                      description: |-
+                        TaskID is the Redis stream message ID of the submitted task, used to
+                        correlate results from the agent-tasks-results stream.
+                      type: string
+                    tokenUsage:
+                      description: TokenUsage reports the tokens consumed by this
+                        step's LLM calls.
+                      properties:
+                        inputTokens:
+                          description: InputTokens is the total number of prompt/input
+                            tokens sent to the LLM.
+                          format: int64
+                          type: integer
+                        outputTokens:
+                          description: OutputTokens is the total number of completion/output
+                            tokens generated by the LLM.
+                          format: int64
+                          type: integer
+                        totalTokens:
+                          description: TotalTokens is InputTokens + OutputTokens,
+                            provided for convenient display.
+                          format: int64
+                          type: integer
+                      required:
+                      - inputTokens
+                      - outputTokens
+                      - totalTokens
+                      type: object
+                  required:
+                  - name
+                  - phase
+                  type: object
+                type: array
+              totalTokenUsage:
+                description: TotalTokenUsage is the sum of token usage across all
+                  steps.
+                properties:
+                  inputTokens:
+                    description: InputTokens is the total number of prompt/input tokens
+                      sent to the LLM.
+                    format: int64
+                    type: integer
+                  outputTokens:
+                    description: OutputTokens is the total number of completion/output
+                      tokens generated by the LLM.
+                    format: int64
+                    type: integer
+                  totalTokens:
+                    description: TotalTokens is InputTokens + OutputTokens, provided
+                      for convenient display.
+                    format: int64
+                    type: integer
+                required:
+                - inputTokens
+                - outputTokens
+                - totalTokens
+                type: object
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,241 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: arkevents.arkonis.dev
+spec:
+  group: arkonis.dev
+  names:
+    kind: ArkEvent
+    listKind: ArkEventList
+    plural: arkevents
+    singular: arkevent
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.source.type
+      name: Type
+      type: string
+    - jsonPath: .spec.suspended
+      name: Suspended
+      type: boolean
+    - jsonPath: .status.firedCount
+      name: Fired
+      type: integer
+    - jsonPath: .status.lastFiredAt
+      name: Last Fired
+      type: date
+    - jsonPath: .status.nextFireAt
+      name: Next Fire
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ArkEvent fires ArkFlow runs in response to external events:
+          a cron schedule, an inbound HTTP webhook, or another pipeline completing.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ArkEventSpec defines the desired state of ArkEvent.
+            properties:
+              concurrencyPolicy:
+                default: Allow
+                description: |-
+                  ConcurrencyPolicy controls what happens when the trigger fires while a previous
+                  run is still in progress. Defaults to Allow.
+                enum:
+                - Allow
+                - Forbid
+                type: string
+              source:
+                description: Source defines what fires this trigger.
+                properties:
+                  cron:
+                    description: |-
+                      Cron is a standard 5-field cron expression (minute hour dom month dow).
+                      Only used when type=cron.
+                      Example: "0 9 * * 1-5" (9am on weekdays)
+                    type: string
+                  pipelineOutput:
+                    description: |-
+                      PipelineOutput triggers when the named ArkFlow reaches a phase.
+                      Only used when type=pipeline-output.
+                    properties:
+                      name:
+                        description: Name is the ArkFlow to watch.
+                        type: string
+                      onPhase:
+                        default: Succeeded
+                        description: OnPhase is the pipeline phase that fires the
+                          trigger. Defaults to Succeeded.
+                        enum:
+                        - Pending
+                        - Running
+                        - Succeeded
+                        - Failed
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  type:
+                    description: 'Type is the source type: cron | webhook | pipeline-output.'
+                    enum:
+                    - cron
+                    - webhook
+                    - pipeline-output
+                    type: string
+                required:
+                - type
+                type: object
+              suspended:
+                default: false
+                description: Suspended pauses the trigger without deleting it.
+                type: boolean
+              targets:
+                description: Targets is the list of pipelines to dispatch when the
+                  trigger fires.
+                items:
+                  description: ArkEventTarget describes a pipeline to dispatch when
+                    the trigger fires.
+                  properties:
+                    input:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Input values to set on the dispatched pipeline, overriding the template pipeline's inputs.
+                        Values are Go template strings evaluated with the trigger fire context:
+                          {{ .trigger.name }}    — trigger name
+                          {{ .trigger.firedAt }} — RFC3339 fire timestamp
+                          {{ .trigger.body.* }} — JSON fields from the webhook request body (webhook type only)
+                          {{ .trigger.output }} — upstream pipeline output (pipeline-output type only)
+                      type: object
+                    pipeline:
+                      description: Pipeline is the name of the ArkFlow spec to use
+                        as a template for the dispatched run.
+                      type: string
+                  required:
+                  - pipeline
+                  type: object
+                minItems: 1
+                type: array
+            required:
+            - source
+            - targets
+            type: object
+          status:
+            description: ArkEventStatus defines the observed state of ArkEvent.
+            properties:
+              conditions:
+                description: Conditions reflect the current state of the trigger.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              firedCount:
+                description: FiredCount is the total number of times this trigger
+                  has fired.
+                format: int64
+                type: integer
+              lastFiredAt:
+                description: LastFiredAt is when the trigger last dispatched pipelines.
+                format: date-time
+                type: string
+              nextFireAt:
+                description: NextFireAt is the next scheduled fire time (cron type
+                  only).
+                format: date-time
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the .metadata.generation this status
+                  reflects.
+                format: int64
+                type: integer
+              webhookURL:
+                description: |-
+                  WebhookURL is the URL to POST to in order to fire this trigger (webhook type only).
+                  Requires --trigger-webhook-url to be configured on the operator.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
