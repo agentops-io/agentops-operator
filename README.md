@@ -122,7 +122,49 @@ kubectl get arkflows -w
 
 ---
 
-## Install
+## ark — local development CLI
+
+Run ArkFlow pipelines on your laptop without a Kubernetes cluster or Redis. The same YAML files that work with `kubectl apply -f` work unchanged with `ark run`.
+
+```bash
+# Pre-built binary — download from the releases page, or:
+go install github.com/arkonis-dev/ark-operator/cmd/ark@latest
+
+# Try it immediately — no API key needed:
+ark run quickstart.yaml --provider mock --watch
+```
+
+```
+$ ark run --help
+
+Run an ArkFlow defined in a multi-document YAML file.
+The file may contain ArkAgent, ArkFlow, and other resource definitions —
+only ArkAgent and ArkFlow documents are used; everything else is ignored.
+
+Examples:
+  ark run quickstart.yaml
+  ark run quickstart.yaml --provider mock
+  ark run quickstart.yaml --provider openai --watch
+  ark run quickstart.yaml --watch --output json
+  ark run pipeline.yaml --input '{"topic":"Kubernetes operators"}'
+
+Usage:
+  ark run <file> [flags]
+
+Flags:
+      --dry-run           Validate YAML and print a summary without executing
+      --input string      Flow input as a JSON object, e.g. '{"topic":"Kubernetes"}'
+      --no-mcp            Skip MCP tool server connections
+      --output string     Output format: text or json (default "text")
+      --provider string   LLM provider: auto, anthropic, openai, or mock (default "auto")
+      --watch             Stream step-by-step output as the flow executes
+```
+
+Provider defaults to `auto`: `claude-*` → Anthropic, `gpt-*`/`o*` → OpenAI. Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in your environment.
+
+---
+
+## Install (operator)
 
 **Prerequisites:** Kubernetes 1.31+, Redis (for the task queue)
 
