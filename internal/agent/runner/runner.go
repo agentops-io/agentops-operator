@@ -108,8 +108,16 @@ func (r *Runner) CallTool(ctx context.Context, toolName string, input json.RawMe
 
 // RunTask executes a single task through the provider's agentic loop.
 // Returns the text result, accumulated token usage, and any error.
+// If task.Meta["stream_key"] is set and a task queue is available, each generated
+// token chunk is published to that Redis List in real time.
 func (r *Runner) RunTask(ctx context.Context, task queue.Task) (string, queue.TokenUsage, error) {
-	return r.provider.RunTask(ctx, r.cfg, task, r.allTools, r.CallTool)
+	var chunkFn func(string)
+	if key := task.Meta["stream_key"]; key != "" && r.queue != nil {
+		chunkFn = func(chunk string) {
+			r.queue.PublishChunk(key, chunk)
+		}
+	}
+	return r.provider.RunTask(ctx, r.cfg, task, r.allTools, r.CallTool, chunkFn)
 }
 
 // callWebhook invokes an inline HTTP webhook tool and returns the response body as text.

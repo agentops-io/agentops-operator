@@ -23,6 +23,7 @@ func (m *mockProvider) RunTask(
 	_ queue.Task,
 	_ []mcp.Tool,
 	_ func(context.Context, string, json.RawMessage) (string, error),
+	_ func(string),
 ) (string, queue.TokenUsage, error) {
 	return m.result, queue.TokenUsage{}, m.err
 }

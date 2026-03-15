@@ -174,7 +174,7 @@ func (r *ArkFlowReconciler) submitPendingSteps(
 			st.Message = fmt.Sprintf("input template error: %v", err)
 			continue
 		}
-		taskID, err := r.submitTask(rdb, prompt)
+		taskID, err := r.submitTask(rdb, prompt, f.Annotations["arkonis.dev/stream-key"])
 		if err != nil {
 			logger.Error(err, "submitting task to Redis", "step", step.Name)
 			_ = r.Status().Update(ctx, f)
@@ -234,10 +234,15 @@ func (r *ArkFlowReconciler) collectResults(
 }
 
 // submitTask enqueues a task on the shared agent-tasks stream and returns the Redis message ID.
-func (r *ArkFlowReconciler) submitTask(rdb *redis.Client, prompt string) (string, error) {
+// streamKey, if non-empty, is included in the task payload so the agent can publish token chunks.
+func (r *ArkFlowReconciler) submitTask(rdb *redis.Client, prompt, streamKey string) (string, error) {
+	values := map[string]any{"prompt": prompt}
+	if streamKey != "" {
+		values["stream_key"] = streamKey
+	}
 	id, err := rdb.XAdd(context.Background(), &redis.XAddArgs{
 		Stream: taskStream,
-		Values: map[string]any{"prompt": prompt},
+		Values: values,
 	}).Result()
 	if err != nil {
 		return "", fmt.Errorf("XADD %s: %w", taskStream, err)

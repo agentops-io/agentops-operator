@@ -59,12 +59,14 @@ type Provider struct {
 // RunTask implements providers.LLMProvider.
 // It matches the task prompt against Responses and returns the canned reply.
 // No real LLM calls are made; tools are never invoked.
+// If chunkFn is non-nil, the reply is emitted word-by-word to simulate streaming.
 func (p *Provider) RunTask(
 	ctx context.Context,
 	_ *config.Config,
 	task queue.Task,
 	_ []mcp.Tool,
 	_ func(context.Context, string, json.RawMessage) (string, error),
+	chunkFn func(string),
 ) (string, queue.TokenUsage, error) {
 	if p.Delay > 0 {
 		select {
@@ -75,6 +77,16 @@ func (p *Provider) RunTask(
 	}
 
 	reply := p.match(task.Prompt)
+
+	if chunkFn != nil {
+		words := strings.Fields(reply)
+		for i, w := range words {
+			if i > 0 {
+				chunkFn(" ")
+			}
+			chunkFn(w)
+		}
+	}
 
 	// Simulate token counts proportional to prompt/reply length
 	// so callers can exercise budget and cost-tracking logic.

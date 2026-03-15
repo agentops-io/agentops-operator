@@ -60,10 +60,11 @@ type ArkEventReconciler struct {
 // FireContext carries information about a trigger firing event, used to resolve
 // input templates on dispatched flows.
 type FireContext struct {
-	Name    string
-	FiredAt string
-	Output  string         // upstream flow output (pipeline-output type)
-	Body    map[string]any // webhook request body fields
+	Name      string
+	FiredAt   string
+	Output    string         // upstream flow output (pipeline-output type)
+	Body      map[string]any // webhook request body fields
+	StreamKey string         // optional Redis List key for token-level streaming (SSE mode)
 }
 
 func (r *ArkEventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -319,6 +320,10 @@ func (r *ArkEventReconciler) buildFlow(
 
 	// Generated name: <trigger>-<template>-<timestamp-suffix>
 	suffix := time.Now().UTC().Format("20060102-150405")
+	annotations := map[string]string{}
+	if fireCtx.StreamKey != "" {
+		annotations["arkonis.dev/stream-key"] = fireCtx.StreamKey
+	}
 	flow := &arkonisv1alpha1.ArkFlow{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s-%s", trigger.Name, target.Pipeline, suffix),
@@ -327,6 +332,7 @@ func (r *ArkEventReconciler) buildFlow(
 				"arkonis.dev/trigger":          trigger.Name,
 				"arkonis.dev/trigger-template": target.Pipeline,
 			},
+			Annotations: annotations,
 		},
 		Spec: arkonisv1alpha1.ArkFlowSpec{
 			Steps:          tmpl.Spec.Steps,

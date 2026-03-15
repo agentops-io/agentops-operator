@@ -161,6 +161,21 @@ func (q *Queue) Nack(task Task, reason string) {
 	}).Err()
 }
 
+// StreamDone is the sentinel value appended to a chunk list to signal end-of-stream.
+const StreamDone = "__EOF__"
+
+// PublishChunk appends a token chunk to the named Redis List used for streaming.
+func (q *Queue) PublishChunk(key, chunk string) {
+	_ = q.rdb.RPush(context.Background(), key, chunk).Err()
+}
+
+// DoneChunk signals end-of-stream by appending StreamDone and setting a 5-minute expiry.
+func (q *Queue) DoneChunk(key string) {
+	ctx := context.Background()
+	_ = q.rdb.RPush(ctx, key, StreamDone).Err()
+	_ = q.rdb.Expire(ctx, key, 5*time.Minute).Err()
+}
+
 // Close releases the Redis connection.
 func (q *Queue) Close() {
 	_ = q.rdb.Close()

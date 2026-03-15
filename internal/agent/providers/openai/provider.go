@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	openaisdk "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -33,12 +34,14 @@ type Provider struct{}
 // RunTask executes a task through the OpenAI agentic tool-use loop.
 // It keeps calling the API until the model stops requesting tool calls.
 // Token usage is accumulated across all API calls and returned with the result.
+// If chunkFn is non-nil, the final text turn is streamed token-by-token.
 func (p *Provider) RunTask(
 	ctx context.Context,
 	cfg *config.Config,
 	task queue.Task,
 	tools []mcp.Tool,
 	callTool func(context.Context, string, json.RawMessage) (string, error),
+	chunkFn func(string),
 ) (string, queue.TokenUsage, error) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -71,6 +74,17 @@ func (p *Provider) RunTask(
 			params.Tools = openaiTools
 		}
 
+		// Use streaming for the final text turn when chunkFn is set and no tools are active.
+		if chunkFn != nil && len(openaiTools) == 0 {
+			text, turnUsage, err := p.runStreamingTurn(ctx, client, params, chunkFn)
+			if err != nil {
+				return "", usage, err
+			}
+			usage.InputTokens += turnUsage.InputTokens
+			usage.OutputTokens += turnUsage.OutputTokens
+			return text, usage, nil
+		}
+
 		resp, err := client.Chat.Completions.New(ctx, params)
 		if err != nil {
 			return "", usage, fmt.Errorf("openai API error: %w", err)
@@ -89,7 +103,11 @@ func (p *Provider) RunTask(
 		messages = append(messages, assistantMessage(choice.Message))
 
 		if choice.FinishReason != "tool_calls" || len(choice.Message.ToolCalls) == 0 {
-			return choice.Message.Content, usage, nil
+			text := choice.Message.Content
+			if chunkFn != nil {
+				chunkFn(text)
+			}
+			return text, usage, nil
 		}
 
 		// Execute all requested tool calls and append results.
@@ -129,6 +147,39 @@ func rawToMap(raw json.RawMessage) map[string]any {
 		return map[string]any{}
 	}
 	return m
+}
+
+// runStreamingTurn calls the OpenAI streaming API and forwards each text delta to chunkFn.
+func (p *Provider) runStreamingTurn(
+	ctx context.Context,
+	client openaisdk.Client,
+	params openaisdk.ChatCompletionNewParams,
+	chunkFn func(string),
+) (string, queue.TokenUsage, error) {
+	stream := client.Chat.Completions.NewStreaming(ctx, params)
+	defer func() { _ = stream.Close() }()
+
+	var sb strings.Builder
+	var usage queue.TokenUsage
+
+	for stream.Next() {
+		chunk := stream.Current()
+		if chunk.Usage.CompletionTokens > 0 {
+			usage.InputTokens = chunk.Usage.PromptTokens
+			usage.OutputTokens = chunk.Usage.CompletionTokens
+		}
+		if len(chunk.Choices) > 0 {
+			delta := chunk.Choices[0].Delta.Content
+			if delta != "" {
+				chunkFn(delta)
+				sb.WriteString(delta)
+			}
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return "", usage, fmt.Errorf("openai streaming error: %w", err)
+	}
+	return sb.String(), usage, nil
 }
 
 // assistantMessage converts a ChatCompletionMessage response into a MessageParamUnion

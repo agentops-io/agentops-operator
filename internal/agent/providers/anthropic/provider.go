@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -28,12 +29,14 @@ type Provider struct{}
 // RunTask executes a task through the Anthropic agentic tool-use loop.
 // It keeps calling the API until the model stops requesting tool use.
 // Token usage is accumulated across all API calls and returned with the result.
+// If chunkFn is non-nil, the final text turn is streamed token-by-token via the streaming API.
 func (p *Provider) RunTask(
 	ctx context.Context,
 	cfg *config.Config,
 	task queue.Task,
 	tools []mcp.Tool,
 	callTool func(context.Context, string, json.RawMessage) (string, error),
+	chunkFn func(string),
 ) (string, queue.TokenUsage, error) {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
@@ -62,6 +65,18 @@ func (p *Provider) RunTask(
 			params.Tools = anthropicTools
 		}
 
+		// Use streaming for the final text turn when chunkFn is set.
+		// Tool-use turns always use the non-streaming API so we can inspect tool calls.
+		if chunkFn != nil && len(anthropicTools) == 0 {
+			text, turnUsage, err := p.runStreamingTurn(ctx, client, params, chunkFn)
+			if err != nil {
+				return "", usage, err
+			}
+			usage.InputTokens += turnUsage.InputTokens
+			usage.OutputTokens += turnUsage.OutputTokens
+			return text, usage, nil
+		}
+
 		resp, err := client.Messages.New(ctx, params)
 		if err != nil {
 			return "", usage, fmt.Errorf("anthropic API error: %w", err)
@@ -74,15 +89,62 @@ func (p *Provider) RunTask(
 		messages = append(messages, assistantMessage(resp.Content))
 
 		if resp.StopReason == anthropicsdk.StopReasonEndTurn {
-			return extractText(resp.Content), usage, nil
+			text := extractText(resp.Content)
+			// If we have a chunkFn and this is the final turn, emit the full text as one chunk.
+			// This handles tool-use flows where streaming was deferred.
+			if chunkFn != nil {
+				chunkFn(text)
+			}
+			return text, usage, nil
 		}
 
 		toolResults := executeTools(ctx, resp.Content, callTool)
 		if len(toolResults) == 0 {
-			return extractText(resp.Content), usage, nil
+			text := extractText(resp.Content)
+			if chunkFn != nil {
+				chunkFn(text)
+			}
+			return text, usage, nil
 		}
 		messages = append(messages, anthropicsdk.NewUserMessage(toolResults...))
 	}
+}
+
+// runStreamingTurn calls the Anthropic streaming API and forwards each text delta to chunkFn.
+func (p *Provider) runStreamingTurn(
+	ctx context.Context,
+	client anthropicsdk.Client,
+	params anthropicsdk.MessageNewParams,
+	chunkFn func(string),
+) (string, queue.TokenUsage, error) {
+	stream := client.Messages.NewStreaming(ctx, params)
+	defer func() { _ = stream.Close() }()
+
+	var sb strings.Builder
+	var usage queue.TokenUsage
+
+	for stream.Next() {
+		event := stream.Current()
+		switch event.Type {
+		case "message_start":
+			v := event.AsMessageStart()
+			usage.InputTokens += v.Message.Usage.InputTokens
+			usage.OutputTokens += v.Message.Usage.OutputTokens
+		case "message_delta":
+			v := event.AsMessageDelta()
+			usage.OutputTokens += v.Usage.OutputTokens
+		case "content_block_delta":
+			v := event.AsContentBlockDelta()
+			if textDelta, ok := v.Delta.AsAny().(anthropicsdk.TextDelta); ok {
+				chunkFn(textDelta.Text)
+				sb.WriteString(textDelta.Text)
+			}
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return "", usage, fmt.Errorf("anthropic streaming error: %w", err)
+	}
+	return sb.String(), usage, nil
 }
 
 // toAnthropicTools converts generic mcp.Tools into the Anthropic SDK format.

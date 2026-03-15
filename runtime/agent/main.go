@@ -84,6 +84,12 @@ func main() {
 			defer taskCancel()
 
 			result, usage, err := r.RunTask(taskCtx, t)
+
+			// Signal end-of-stream regardless of success/failure so SSE consumers unblock.
+			if key := t.Meta["stream_key"]; key != "" {
+				q.DoneChunk(key)
+			}
+
 			if err != nil {
 				logger.Error("task failed", "task_id", t.ID, "error", err)
 				q.Nack(t, err.Error())

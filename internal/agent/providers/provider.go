@@ -24,6 +24,7 @@ type LLMProvider interface {
 	// RunTask executes a task through the provider's agentic tool-use loop.
 	// tools is the merged list of available tools (MCP + webhook + built-ins).
 	// callTool dispatches a named tool invocation and returns the result.
+	// chunkFn, if non-nil, is called with each text token as it is generated (streaming mode).
 	// Returns the text result, token usage accumulated across all LLM calls, and any error.
 	RunTask(
 		ctx context.Context,
@@ -31,6 +32,7 @@ type LLMProvider interface {
 		task queue.Task,
 		tools []mcp.Tool,
 		callTool func(context.Context, string, json.RawMessage) (string, error),
+		chunkFn func(string),
 	) (string, queue.TokenUsage, error)
 }
 

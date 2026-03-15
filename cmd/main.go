@@ -248,7 +248,7 @@ func main() {
 
 	// Start the trigger webhook HTTP server as a manager Runnable so it
 	// shares the manager's lifecycle (graceful shutdown on signal).
-	webhookSrv := controller.NewTriggerWebhookServer(triggerReconciler)
+	webhookSrv := controller.NewTriggerWebhookServer(triggerReconciler, os.Getenv("TASK_QUEUE_URL"))
 	if err := mgr.Add(triggerWebhookRunnable(triggerWebhookAddr, webhookSrv)); err != nil {
 		setupLog.Error(err, "Failed to add trigger webhook server to manager")
 		os.Exit(1)
