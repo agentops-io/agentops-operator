@@ -14,388 +14,367 @@ spec:
     singular: arkagent
   scope: Namespaced
   versions:
-    - additionalPrinterColumns:
-        - jsonPath: .spec.model
-          name: Model
-          type: string
-        - jsonPath: .spec.replicas
-          name: Replicas
-          type: integer
-        - jsonPath: .status.readyReplicas
-          name: Ready
-          type: integer
-        - jsonPath: .status.dailyTokenUsage.totalTokens
-          name: Tokens(24h)
-          type: integer
-        - jsonPath: .metadata.creationTimestamp
-          name: Age
-          type: date
-      name: v1alpha1
-      schema:
-        openAPIV3Schema:
-          description: ArkAgent manages a pool of LLM agent instances.
-          properties:
-            apiVersion:
-              description: |-
-                APIVersion defines the versioned schema of this representation of an object.
-                Servers should convert recognized schemas to the latest internal value, and
-                may reject unrecognized values.
-                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-              type: string
-            kind:
-              description: |-
-                Kind is a string value representing the REST resource this object represents.
-                Servers may infer this from the endpoint the client submits requests to.
-                Cannot be updated.
-                In CamelCase.
-                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-              type: string
-            metadata:
-              type: object
-            spec:
-              description: ArkAgentSpec defines the desired state of ArkAgent.
-              properties:
-                configRef:
-                  description:
-                    ConfigRef optionally references an ArkSettings for shared
-                    settings.
-                  properties:
-                    name:
-                      description: Name of the referenced object.
-                      type: string
-                  required:
-                    - name
-                  type: object
-                limits:
-                  description: Limits constrains agent resource usage.
-                  properties:
-                    maxConcurrentTasks:
-                      default: 5
-                      description:
-                        MaxConcurrentTasks is the maximum number of tasks
-                        processed in parallel per replica.
-                      type: integer
-                    maxDailyTokens:
-                      description: |-
-                        MaxDailyTokens is the rolling 24-hour token budget (input + output combined) for this
-                        deployment. When the budget is reached, the operator scales replicas to 0 and sets a
-                        BudgetExceeded condition. The deployment resumes automatically once the 24-hour window
-                        rotates and usage drops below the limit. Zero means no daily limit.
-                      format: int64
-                      minimum: 1
-                      type: integer
-                    maxTokensPerCall:
-                      default: 8000
-                      description:
-                        MaxTokensPerCall is the maximum number of tokens
-                        per Anthropic API call.
-                      type: integer
-                    timeoutSeconds:
-                      default: 120
-                      description: TimeoutSeconds is the per-task deadline.
-                      type: integer
-                  type: object
-                livenessProbe:
-                  description: LivenessProbe defines how agent health is evaluated.
-                  properties:
-                    intervalSeconds:
-                      default: 30
-                      description: IntervalSeconds is how often the probe runs.
-                      type: integer
-                    type:
-                      description:
-                        'Type is the probe strategy: "semantic" (LLM-based)
-                        or "ping" (HTTP).'
-                      enum:
-                        - semantic
-                        - ping
-                      type: string
-                    validatorPrompt:
-                      description: ValidatorPrompt is the prompt sent when Type is "semantic".
-                      type: string
-                  required:
-                    - type
-                  type: object
-                mcpServers:
-                  description:
-                    MCPServers lists the MCP tool servers available to this
-                    agent.
-                  items:
-                    description: MCPServerSpec defines one MCP tool server.
-                    properties:
-                      name:
-                        description:
-                          Name is a human-readable identifier for this MCP
-                          server.
-                        type: string
-                      url:
-                        description: URL is the SSE endpoint of the MCP server.
-                        type: string
-                    required:
-                      - name
-                      - url
-                    type: object
-                  type: array
-                memoryRef:
-                  description: |-
-                    MemoryRef optionally references an ArkMemory that defines the persistent
-                    memory backend for agent instances. When set, the operator injects memory
-                    connection details as environment variables into agent pods.
-                  properties:
-                    name:
-                      description: Name of the referenced object.
-                      type: string
-                  required:
-                    - name
-                  type: object
-                model:
-                  description: Model is the LLM model ID (e.g. "claude-sonnet-4-20250514").
-                  minLength: 1
-                  type: string
-                replicas:
-                  default: 1
-                  description: Replicas is the number of agent instances to run.
-                  format: int32
-                  maximum: 50
-                  minimum: 0
-                  type: integer
-                systemPrompt:
-                  description: |-
-                    SystemPrompt is the inline system message injected into every agent call.
-                    For long or frequently-iterated prompts, prefer systemPromptRef instead.
-                  type: string
-                systemPromptRef:
-                  description: |-
-                    SystemPromptRef references a ConfigMap or Secret key whose content is used
-                    as the system prompt. Takes precedence over systemPrompt when both are set.
-                    Updating the referenced ConfigMap or Secret triggers an automatic rolling
-                    restart of agent pods.
-                  properties:
-                    configMapKeyRef:
-                      description:
-                        ConfigMapKeyRef selects a key of a ConfigMap in the
-                        same namespace.
-                      properties:
-                        key:
-                          description: The key to select.
-                          type: string
-                        name:
-                          default: ""
-                          description: |-
-                            Name of the referent.
-                            This field is effectively required, but due to backwards compatibility is
-                            allowed to be empty. Instances of this type with an empty value here are
-                            almost certainly wrong.
-                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          type: string
-                        optional:
-                          description:
-                            Specify whether the ConfigMap or its key must
-                            be defined
-                          type: boolean
-                      required:
-                        - key
-                      type: object
-                      x-kubernetes-map-type: atomic
-                    secretKeyRef:
-                      description: |-
-                        SecretKeyRef selects a key of a Secret in the same namespace.
-                        Use this when the prompt contains sensitive instructions.
-                      properties:
-                        key:
-                          description:
-                            The key of the secret to select from.  Must be
-                            a valid secret key.
-                          type: string
-                        name:
-                          default: ""
-                          description: |-
-                            Name of the referent.
-                            This field is effectively required, but due to backwards compatibility is
-                            allowed to be empty. Instances of this type with an empty value here are
-                            almost certainly wrong.
-                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          type: string
-                        optional:
-                          description:
-                            Specify whether the Secret or its key must be
-                            defined
-                          type: boolean
-                      required:
-                        - key
-                      type: object
-                      x-kubernetes-map-type: atomic
-                  type: object
-                tools:
-                  description: |-
-                    Tools lists inline HTTP webhook tools available to agent pods without an external MCP server.
-                    The operator serialises these as JSON into the AGENT_WEBHOOK_TOOLS environment variable.
-                  items:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.model
+      name: Model
+      type: string
+    - jsonPath: .spec.replicas
+      name: Replicas
+      type: integer
+    - jsonPath: .status.readyReplicas
+      name: Ready
+      type: integer
+    - jsonPath: .status.dailyTokenUsage.totalTokens
+      name: Tokens(24h)
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ArkAgent manages a pool of LLM agent instances.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ArkAgentSpec defines the desired state of ArkAgent.
+            properties:
+              configRef:
+                description: ConfigRef optionally references an ArkSettings for shared
+                  settings.
+                properties:
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - name
+                type: object
+              limits:
+                description: Limits constrains agent resource usage.
+                properties:
+                  maxConcurrentTasks:
+                    default: 5
+                    description: MaxConcurrentTasks is the maximum number of tasks
+                      processed in parallel per replica.
+                    type: integer
+                  maxDailyTokens:
                     description: |-
-                      WebhookToolSpec defines an inline HTTP tool available to agent pods without a full MCP server.
-                      The agent runtime calls the URL directly when the LLM invokes the tool.
+                      MaxDailyTokens is the rolling 24-hour token budget (input + output combined) for this
+                      deployment. When the budget is reached, the operator scales replicas to 0 and sets a
+                      BudgetExceeded condition. The deployment resumes automatically once the 24-hour window
+                      rotates and usage drops below the limit. Zero means no daily limit.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                  maxTokensPerCall:
+                    default: 8000
+                    description: MaxTokensPerCall is the maximum number of tokens
+                      per Anthropic API call.
+                    type: integer
+                  timeoutSeconds:
+                    default: 120
+                    description: TimeoutSeconds is the per-task deadline.
+                    type: integer
+                type: object
+              livenessProbe:
+                description: LivenessProbe defines how agent health is evaluated.
+                properties:
+                  intervalSeconds:
+                    default: 30
+                    description: IntervalSeconds is how often the probe runs.
+                    type: integer
+                  type:
+                    description: 'Type is the probe strategy: "semantic" (LLM-based)
+                      or "ping" (HTTP).'
+                    enum:
+                    - semantic
+                    - ping
+                    type: string
+                  validatorPrompt:
+                    description: ValidatorPrompt is the prompt sent when Type is "semantic".
+                    type: string
+                required:
+                - type
+                type: object
+              mcpServers:
+                description: MCPServers lists the MCP tool servers available to this
+                  agent.
+                items:
+                  description: MCPServerSpec defines one MCP tool server.
+                  properties:
+                    name:
+                      description: Name is a human-readable identifier for this MCP
+                        server.
+                      type: string
+                    url:
+                      description: URL is the SSE endpoint of the MCP server.
+                      type: string
+                  required:
+                  - name
+                  - url
+                  type: object
+                type: array
+              memoryRef:
+                description: |-
+                  MemoryRef optionally references an ArkMemory that defines the persistent
+                  memory backend for agent instances. When set, the operator injects memory
+                  connection details as environment variables into agent pods.
+                properties:
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - name
+                type: object
+              model:
+                description: Model is the LLM model ID (e.g. "claude-sonnet-4-20250514").
+                minLength: 1
+                type: string
+              replicas:
+                default: 1
+                description: Replicas is the number of agent instances to run.
+                format: int32
+                maximum: 50
+                minimum: 0
+                type: integer
+              systemPrompt:
+                description: |-
+                  SystemPrompt is the inline system message injected into every agent call.
+                  For long or frequently-iterated prompts, prefer systemPromptRef instead.
+                type: string
+              systemPromptRef:
+                description: |-
+                  SystemPromptRef references a ConfigMap or Secret key whose content is used
+                  as the system prompt. Takes precedence over systemPrompt when both are set.
+                  Updating the referenced ConfigMap or Secret triggers an automatic rolling
+                  restart of agent pods.
+                properties:
+                  configMapKeyRef:
+                    description: ConfigMapKeyRef selects a key of a ConfigMap in the
+                      same namespace.
                     properties:
-                      description:
-                        description:
-                          Description explains the tool's purpose to the
-                          LLM.
-                        type: string
-                      inputSchema:
-                        description: |-
-                          InputSchema is a JSON Schema object (as a raw JSON string) describing the tool's
-                          input parameters. The LLM uses this to construct valid inputs.
-                        type: string
-                      method:
-                        default: POST
-                        description:
-                          Method is the HTTP method used when calling the
-                          endpoint.
-                        enum:
-                          - GET
-                          - POST
-                          - PUT
-                          - PATCH
+                      key:
+                        description: The key to select.
                         type: string
                       name:
-                        description:
-                          Name is the tool identifier exposed to the LLM.
-                          Must be unique within the deployment.
-                        minLength: 1
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         type: string
-                      url:
-                        description:
-                          URL is the HTTP endpoint the agent calls when the
-                          LLM invokes this tool.
-                        type: string
+                      optional:
+                        description: Specify whether the ConfigMap or its key must
+                          be defined
+                        type: boolean
                     required:
-                      - name
-                      - url
+                    - key
                     type: object
-                  type: array
-              required:
-                - model
-              type: object
-              x-kubernetes-validations:
-                - message: at least one of systemPrompt or systemPromptRef must be set
-                  rule: has(self.systemPrompt) || has(self.systemPromptRef)
-            status:
-              description: ArkAgentStatus defines the observed state of ArkAgent.
-              properties:
-                conditions:
-                  description: Conditions reflect the current state of the ArkAgent.
-                  items:
-                    description:
-                      Condition contains details for one aspect of the current
-                      state of this API Resource.
+                    x-kubernetes-map-type: atomic
+                  secretKeyRef:
+                    description: |-
+                      SecretKeyRef selects a key of a Secret in the same namespace.
+                      Use this when the prompt contains sensitive instructions.
                     properties:
-                      lastTransitionTime:
+                      key:
+                        description: The key of the secret to select from.  Must be
+                          a valid secret key.
+                        type: string
+                      name:
+                        default: ""
                         description: |-
-                          lastTransitionTime is the last time the condition transitioned from one status to another.
-                          This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
-                        format: date-time
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         type: string
-                      message:
-                        description: |-
-                          message is a human readable message indicating details about the transition.
-                          This may be an empty string.
-                        maxLength: 32768
-                        type: string
-                      observedGeneration:
-                        description: |-
-                          observedGeneration represents the .metadata.generation that the condition was set based upon.
-                          For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
-                          with respect to the current state of the instance.
-                        format: int64
-                        minimum: 0
-                        type: integer
-                      reason:
-                        description: |-
-                          reason contains a programmatic identifier indicating the reason for the condition's last transition.
-                          Producers of specific condition types may define expected values and meanings for this field,
-                          and whether the values are considered a guaranteed API.
-                          The value should be a CamelCase string.
-                          This field may not be empty.
-                        maxLength: 1024
-                        minLength: 1
-                        pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
-                        type: string
-                      status:
-                        description: status of the condition, one of True, False, Unknown.
-                        enum:
-                          - "True"
-                          - "False"
-                          - Unknown
-                        type: string
-                      type:
-                        description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                        maxLength: 316
-                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
-                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be
+                          defined
+                        type: boolean
                     required:
-                      - lastTransitionTime
-                      - message
-                      - reason
-                      - status
-                      - type
+                    - key
                     type: object
-                  type: array
-                  x-kubernetes-list-map-keys:
-                    - type
-                  x-kubernetes-list-type: map
-                dailyTokenUsage:
+                    x-kubernetes-map-type: atomic
+                type: object
+              tools:
+                description: |-
+                  Tools lists inline HTTP webhook tools available to agent pods without an external MCP server.
+                  The operator serialises these as JSON into the AGENT_WEBHOOK_TOOLS environment variable.
+                items:
                   description: |-
-                    DailyTokenUsage is the sum of tokens consumed by this deployment in the rolling 24-hour
-                    window. Populated only when spec.limits.maxDailyTokens is set.
+                    WebhookToolSpec defines an inline HTTP tool available to agent pods without a full MCP server.
+                    The agent runtime calls the URL directly when the LLM invokes the tool.
                   properties:
-                    inputTokens:
-                      description:
-                        InputTokens is the total number of prompt/input tokens
-                        sent to the LLM.
-                      format: int64
-                      type: integer
-                    outputTokens:
-                      description:
-                        OutputTokens is the total number of completion/output
-                        tokens generated by the LLM.
-                      format: int64
-                      type: integer
-                    totalTokens:
-                      description:
-                        TotalTokens is InputTokens + OutputTokens, provided
-                        for convenient display.
-                      format: int64
-                      type: integer
+                    description:
+                      description: Description explains the tool's purpose to the
+                        LLM.
+                      type: string
+                    inputSchema:
+                      description: |-
+                        InputSchema is a JSON Schema object (as a raw JSON string) describing the tool's
+                        input parameters. The LLM uses this to construct valid inputs.
+                      type: string
+                    method:
+                      default: POST
+                      description: Method is the HTTP method used when calling the
+                        endpoint.
+                      enum:
+                      - GET
+                      - POST
+                      - PUT
+                      - PATCH
+                      type: string
+                    name:
+                      description: Name is the tool identifier exposed to the LLM.
+                        Must be unique within the deployment.
+                      minLength: 1
+                      type: string
+                    url:
+                      description: URL is the HTTP endpoint the agent calls when the
+                        LLM invokes this tool.
+                      type: string
                   required:
-                    - inputTokens
-                    - outputTokens
-                    - totalTokens
+                  - name
+                  - url
                   type: object
-                observedGeneration:
-                  description:
-                    ObservedGeneration is the .metadata.generation this status
-                    reflects.
-                  format: int64
-                  type: integer
-                readyReplicas:
-                  description:
-                    ReadyReplicas is the number of agent pods ready to accept
-                    tasks.
-                  format: int32
-                  type: integer
-                replicas:
-                  description:
-                    Replicas is the total number of agent pods (ready or
-                    not).
-                  format: int32
-                  type: integer
-              type: object
-          required:
-            - spec
-          type: object
-      served: true
-      storage: true
-      subresources:
-        scale:
-          specReplicasPath: .spec.replicas
-          statusReplicasPath: .status.replicas
-        status: {}
+                type: array
+            required:
+            - model
+            type: object
+            x-kubernetes-validations:
+            - message: at least one of systemPrompt or systemPromptRef must be set
+              rule: has(self.systemPrompt) || has(self.systemPromptRef)
+          status:
+            description: ArkAgentStatus defines the observed state of ArkAgent.
+            properties:
+              conditions:
+                description: Conditions reflect the current state of the ArkAgent.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              dailyTokenUsage:
+                description: |-
+                  DailyTokenUsage is the sum of tokens consumed by this deployment in the rolling 24-hour
+                  window. Populated only when spec.limits.maxDailyTokens is set.
+                properties:
+                  inputTokens:
+                    description: InputTokens is the total number of prompt/input tokens
+                      sent to the LLM.
+                    format: int64
+                    type: integer
+                  outputTokens:
+                    description: OutputTokens is the total number of completion/output
+                      tokens generated by the LLM.
+                    format: int64
+                    type: integer
+                  totalTokens:
+                    description: TotalTokens is InputTokens + OutputTokens, provided
+                      for convenient display.
+                    format: int64
+                    type: integer
+                required:
+                - inputTokens
+                - outputTokens
+                - totalTokens
+                type: object
+              observedGeneration:
+                description: ObservedGeneration is the .metadata.generation this status
+                  reflects.
+                format: int64
+                type: integer
+              readyReplicas:
+                description: ReadyReplicas is the number of agent pods ready to accept
+                  tasks.
+                format: int32
+                type: integer
+              replicas:
+                description: Replicas is the total number of agent pods (ready or
+                  not).
+                format: int32
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
+      status: {}

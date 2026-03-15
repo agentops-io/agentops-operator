@@ -4,82 +4,82 @@ kind: ClusterRole
 metadata:
   name: manager-role
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-      - pods
-      - secrets
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
-      - patch
-  - apiGroups:
-      - ""
-    resources:
-      - services
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - apps
-    resources:
-      - deployments
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - arkonis.dev
-    resources:
-      - arkagents
-      - arkflows
-      - arkmemories
-      - arkservices
-      - arksettings
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - arkonis.dev
-    resources:
-      - arkagents/finalizers
-      - arkflows/finalizers
-      - arkmemories/finalizers
-      - arkservices/finalizers
-      - arksettings/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - arkonis.dev
-    resources:
-      - arkagents/status
-      - arkflows/status
-      - arkmemories/status
-      - arkservices/status
-      - arksettings/status
-    verbs:
-      - get
-      - patch
-      - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - pods
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkagents
+  - arkflows
+  - arkmemories
+  - arkservices
+  - arksettings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkagents/finalizers
+  - arkflows/finalizers
+  - arkmemories/finalizers
+  - arkservices/finalizers
+  - arksettings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkagents/status
+  - arkflows/status
+  - arkmemories/status
+  - arkservices/status
+  - arksettings/status
+  verbs:
+  - get
+  - patch
+  - update
