@@ -145,7 +145,7 @@ func (r *ArkEventReconciler) reconcileCron(ctx context.Context, trigger *arkonis
 			Name:    trigger.Name,
 			FiredAt: now.Format(time.RFC3339),
 		}
-		if err := r.fire(ctx, trigger, fireCtx); err != nil {
+		if _, err := r.fire(ctx, trigger, fireCtx); err != nil {
 			return ctrl.Result{}, err
 		}
 		nowMeta := metav1.NewTime(now)
@@ -250,7 +250,7 @@ func (r *ArkEventReconciler) reconcilePipelineOutput(ctx context.Context, trigge
 		FiredAt: now.Format(time.RFC3339),
 		Output:  flow.Status.Output,
 	}
-	if err := r.fire(ctx, trigger, fireCtx); err != nil {
+	if _, err := r.fire(ctx, trigger, fireCtx); err != nil {
 		return err
 	}
 	nowMeta := metav1.NewTime(now)
@@ -262,32 +262,35 @@ func (r *ArkEventReconciler) reconcilePipelineOutput(ctx context.Context, trigge
 
 // fire dispatches all target flows for a trigger firing event.
 // It respects the concurrency policy and sets owner references on created flows.
-func (r *ArkEventReconciler) fire(ctx context.Context, trigger *arkonisv1alpha1.ArkEvent, fireCtx FireContext) error {
+// Returns the list of created ArkFlow objects so callers can wait for results.
+func (r *ArkEventReconciler) fire(ctx context.Context, trigger *arkonisv1alpha1.ArkEvent, fireCtx FireContext) ([]*arkonisv1alpha1.ArkFlow, error) {
 	logger := log.FromContext(ctx)
 
 	if trigger.Spec.ConcurrencyPolicy == arkonisv1alpha1.ConcurrencyForbid {
 		running, err := r.hasRunningFlow(ctx, trigger)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if running {
 			logger.Info("skipping fire: ConcurrencyPolicy=Forbid and a flow is still running",
 				"trigger", trigger.Name)
-			return nil
+			return nil, nil
 		}
 	}
 
+	var flows []*arkonisv1alpha1.ArkFlow
 	for _, target := range trigger.Spec.Targets {
 		flow, err := r.buildFlow(ctx, trigger, target, fireCtx)
 		if err != nil {
-			return fmt.Errorf("building flow for target %q: %w", target.Pipeline, err)
+			return nil, fmt.Errorf("building flow for target %q: %w", target.Pipeline, err)
 		}
 		if err := r.Create(ctx, flow); err != nil {
-			return fmt.Errorf("creating flow for target %q: %w", target.Pipeline, err)
+			return nil, fmt.Errorf("creating flow for target %q: %w", target.Pipeline, err)
 		}
 		logger.Info("dispatched flow", "trigger", trigger.Name, "flow", flow.Name)
+		flows = append(flows, flow)
 	}
-	return nil
+	return flows, nil
 }
 
 // buildFlow constructs an ArkFlow from the template flow and fire context.

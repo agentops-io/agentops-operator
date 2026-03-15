@@ -20,7 +20,20 @@ import (
 
 // TriggerWebhookServer handles inbound HTTP requests that fire webhook-type ArkEvents.
 //
-// Endpoint: POST /triggers/{namespace}/{name}/fire
+// Async (default):
+//
+//	POST /triggers/{namespace}/{name}/fire
+//	→ 202 Accepted  { "fired": true, "firedAt": "...", "trigger": "...", "targets": N }
+//
+// Sync mode — holds the connection open until the flow completes:
+//
+//	POST /triggers/{namespace}/{name}/fire?mode=sync
+//	POST /triggers/{namespace}/{name}/fire?mode=sync&timeout=30s
+//	→ 200 OK        { "status": "succeeded", "output": "...", "durationMs": N }
+//	→ 500           { "status": "failed",    "error":  "..." }
+//	→ 504           { "error": "timed out" }
+//
+// Sync mode requires exactly one target flow. The default timeout is 60s; maximum is 5m.
 //
 // Authentication: pass the trigger's token as a Bearer token in the Authorization
 // header or as the `token` query parameter. The token is stored in a Secret named
@@ -36,6 +49,12 @@ type TriggerWebhookServer struct {
 func NewTriggerWebhookServer(r *ArkEventReconciler) *TriggerWebhookServer {
 	return &TriggerWebhookServer{reconciler: r}
 }
+
+const (
+	defaultSyncTimeout = 60 * time.Second
+	maxSyncTimeout     = 5 * time.Minute
+	pollInterval       = 500 * time.Millisecond
+)
 
 // ServeHTTP implements http.Handler.
 func (s *TriggerWebhookServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +117,11 @@ func (s *TriggerWebhookServer) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		Body:    body,
 	}
 
-	if err := s.reconciler.fire(ctx, trigger, fireCtx); err != nil {
+	// Determine sync vs async mode.
+	syncMode := r.URL.Query().Get("mode") == "sync"
+
+	flows, err := s.reconciler.fire(ctx, trigger, fireCtx)
+	if err != nil {
 		logger.Error(err, "firing webhook trigger", "trigger", name)
 		http.Error(w, fmt.Sprintf("fire failed: %v", err), http.StatusInternalServerError)
 		return
@@ -112,6 +135,11 @@ func (s *TriggerWebhookServer) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		logger.Error(err, "updating trigger status after webhook fire")
 	}
 
+	if syncMode {
+		s.handleSync(w, r, flows)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -120,6 +148,93 @@ func (s *TriggerWebhookServer) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		"trigger": name,
 		"targets": len(trigger.Spec.Targets),
 	})
+}
+
+// handleSync waits for the single dispatched flow to finish and writes the result.
+func (s *TriggerWebhookServer) handleSync(w http.ResponseWriter, r *http.Request, flows []*arkonisv1alpha1.ArkFlow) {
+	if len(flows) != 1 {
+		http.Error(w, "sync mode requires exactly one target flow", http.StatusBadRequest)
+		return
+	}
+
+	timeout := defaultSyncTimeout
+	if raw := r.URL.Query().Get("timeout"); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil {
+			timeout = d
+		}
+	}
+	if timeout > maxSyncTimeout {
+		timeout = maxSyncTimeout
+	}
+
+	syncCtx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	start := time.Now()
+	result, err := s.waitForFlow(syncCtx, flows[0])
+	if err != nil {
+		if syncCtx.Err() != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusGatewayTimeout)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error":      fmt.Sprintf("timed out after %s waiting for flow to complete", timeout),
+				"durationMs": time.Since(start).Milliseconds(),
+			})
+			return
+		}
+		http.Error(w, fmt.Sprintf("waiting for flow: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	result.DurationMs = time.Since(start).Milliseconds()
+
+	status := http.StatusOK
+	if result.Status == "failed" {
+		status = http.StatusInternalServerError
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(result)
+}
+
+// syncResult is the response body for sync mode.
+type syncResult struct {
+	Status     string `json:"status"`
+	Output     string `json:"output,omitempty"`
+	Error      string `json:"error,omitempty"`
+	DurationMs int64  `json:"durationMs"`
+}
+
+// waitForFlow polls the flow until it reaches a terminal phase or ctx is cancelled.
+func (s *TriggerWebhookServer) waitForFlow(ctx context.Context, flow *arkonisv1alpha1.ArkFlow) (*syncResult, error) {
+	key := types.NamespacedName{Name: flow.Name, Namespace: flow.Namespace}
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+			f := &arkonisv1alpha1.ArkFlow{}
+			if err := s.reconciler.Get(ctx, key, f); err != nil {
+				return nil, err
+			}
+			switch f.Status.Phase {
+			case arkonisv1alpha1.ArkFlowPhaseSucceeded:
+				return &syncResult{Status: "succeeded", Output: f.Status.Output}, nil
+			case arkonisv1alpha1.ArkFlowPhaseFailed:
+				msg := "flow failed"
+				for _, c := range f.Status.Conditions {
+					if c.Type == "Ready" && c.Status == metav1.ConditionFalse {
+						msg = c.Message
+						break
+					}
+				}
+				return &syncResult{Status: "failed", Error: msg}, nil
+			}
+		}
+	}
 }
 
 // validToken checks the provided token against the one stored in the trigger's webhook token Secret.
